@@ -453,9 +453,12 @@ let many<'r when 'r : equality> (this: Parser<'r>) : Parser<'r list> = (this |> 
 
 let epsilon = new EpsilonParser()
 
-let createParserForwardedToRef<'r when 'r : equality>(name: string) = 
-    let dummyParser = { new TerminalParser<'r>() with override this.Parse (inp: CharStream) = failwith "unimplemented" }
-    let r = ref (dummyParser :> Parser<'r>)
+let private dummyParser<'r when 'r : equality> = 
+   { new TerminalParser<'r>()
+     with override this.Parse (inp: CharStream) = failwith "unimplemented" } :> Parser<'r>
+
+let createParserForwardedToRef<'r when 'r : equality>(name:string) = 
+    let r = ref dummyParser<'r>
     { new NonTerminalParser<'r>() with 
         override this.Chain(t, inp) (f) =
             //printfn "%A" name 
