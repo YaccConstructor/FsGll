@@ -21,6 +21,7 @@ let mutable foundInSaved = 0
 let mutable savedToSaved = 0
 
 //[<CustomEquality; CustomComparison>]
+[<AllowNullLiteral>]
 type CharStream (s: String, ?ind) = 
     let mutable ind = defaultArg ind 0
     
@@ -44,40 +45,49 @@ let processTail(tail: CharStream) =
     if not <| newTail.IsEmpty then Some(newTail) else None
 
 [<Interface>]
-type GParserResult = 
+type IParserResult = 
     abstract member IsSucc : bool 
+    abstract member FailComparison : string * CharStream
 
 [<CustomEquality; NoComparison>]
 type ParserResult<'r when 'r : equality> = 
     | Success of value: 'r * tail: CharStream
     | Failure of msg: string * tail: CharStream
     override this.Equals that = 
-        match that with 
-        | :? ParserResult<'r> as that -> 
-            match this with
-            | Success (v, t) -> match that with Success (v2, t2) -> v = v2 && t = t2 | _ -> false
-            | Failure (s, t) -> match that with Failure (s2, t2) -> s = s2 && t = t2 | _ -> false
-        | _ -> false
+        match this with
+        | Success (v, t) -> 
+            match that with 
+            | :? ParserResult<'r> as thatr -> 
+                match thatr with 
+                | Success (v2, t2) -> v = v2 && t = t2 
+                | _ -> false
+            | _ -> false
+        | Failure (s, t) ->
+            match that with 
+            | :? IParserResult as that when not that.IsSucc -> (s, t) = that.FailComparison 
+            | _ -> false
+
     override this.GetHashCode() = 
         match this with 
         | Success (v, t) -> hash v + hash t 
         | Failure (m, t) -> hash m + hash t
 
-    interface GParserResult with
+    interface IParserResult with
         member x.IsSucc = match x with Success _ -> true | _ -> false
+        member x.FailComparison = match x with Failure (m, t) -> (m, t) | _ -> (null, null)
 
 //type ParserResult () = class end
 //type Success<'a> (value: 'a, tail: CharStream) = class inherit ParserResult () end
 //type Failure (msg: string) = class inherit ParserResult () end
 
-type RSet = HashSet<GParserResult >
-type SSet = HashSet<GParserResult >
-type FSet = HashSet<GParserResult -> unit>
+type RSet = HashSet<IParserResult >
+type SSet = HashSet<IParserResult >
+type FSet = HashSet<IParserResult -> unit>
 
 type HOMap<'k,'v> = Dictionary<'k,'v>
 
 type [<AbstractClass>] GParser () = 
-    abstract member ChainG : Trampoline * CharStream -> (GParserResult -> unit) -> unit
+    abstract member ChainG : Trampoline * CharStream -> (IParserResult -> unit) -> unit
 
 and [<AbstractClass>] Parser<'r when 'r : equality> () = 
     inherit GParser ()
@@ -98,7 +108,7 @@ and [<AbstractClass>] NonTerminalParser<'r when 'r : equality> () =
         let failures = new HashSet<ParserResult<'r> > ()
 
         this.Chain(t, inp) (function
-            | Success (res, tail) as succ when tail.IsEmpty ->  
+            | Success (res, tail) as succ when tail.IsEmpty ->
                 successes.Add(succ) |> ignore
             | Success (_, tail) -> 
                 Failure("UnexpectedTrailingChars", tail) |> failures.Add |> ignore
@@ -106,13 +116,13 @@ and [<AbstractClass>] NonTerminalParser<'r when 'r : equality> () =
         )
 
         t.Run()
-        let sv = t.Saved
-        sv 
-        |> Seq.filter (fun (x: KeyValuePair<GParserResult, FSet>) -> x.Key.IsSucc |> not) 
-        |> Seq.iter(fun x -> printfn "%A" (x.Key))
-//        ks |> Seq.iter (function 
-//            | Failure (_,_) -> ()
-//            | _ -> ())
+//        let sv = t.Saved
+//        sv 
+//        |> Seq.filter (fun (x: KeyValuePair<GParserResult, FSet>) -> x.Key.IsSucc |> not) 
+//        |> Seq.iter(fun x -> printfn "%A" (x.Key))
+////        ks |> Seq.iter (function 
+////            | Failure (_,_) -> ()
+////            | _ -> ())
         (if successes.Count = 0 then failures else successes) |> Seq.toList
 
     override this.MapWithTail<'r2 when 'r2 : equality> (f) = 
@@ -202,12 +212,11 @@ and DisjunctiveParser<'r when 'r : equality>(left: Parser<'r>, right: Parser<'r>
     override this.Chain(t, inp) (f) = 
         let results = new HashSet<ParserResult<'r> > ()
         gather.Value |> List.iter (fun p -> 
-            t.Add(p, inp) (function 
-                | :? ParserResult<'r> as res ->
-                    if not <| results.Contains (res) then 
-                        f res
-                        (res) |> results.Add |> ignore
-                | _ -> failwith "UnexpectedType"
+            t.Add(p, inp) (fun res -> 
+                let res = res :?> ParserResult<'r> 
+                if not <| results.Contains (res) then 
+                    f res
+                    (res) |> results.Add |> ignore
             )
             
         )
@@ -263,7 +272,7 @@ and Trampoline () as tram =
     let backlinks = new Dictionary<CharStream, HOMap<GParser, FSet > >()
 
     // prevents divergence in cyclic GSS traversal
-    let saved = new HOMap<GParserResult, FSet >()
+    let saved = new HOMap<IParserResult, FSet >()
 
     let hasNext() = _queue.Count > 0
 
@@ -299,7 +308,7 @@ and Trampoline () as tram =
                         f res
                 )
             | _, _ -> 
-                let set = new HashSet<GParserResult -> unit>()
+                let set = new HashSet<IParserResult -> unit>()
                 saved.Add (res, set)
                 savedToSaved <- savedToSaved + 1
                 backlinks.[s].[p] |> Seq.toArray |> Seq.iter (fun f ->    
@@ -314,7 +323,7 @@ and Trampoline () as tram =
             
     member this.Saved = saved
 
-    member this.Add (p: GParser, s: CharStream) (f: GParserResult -> unit) = 
+    member this.Add (p: GParser, s: CharStream) (f: IParserResult -> unit) = 
         let tuple = (p, s)
         
         match backlinks.TryGetValue(s) with

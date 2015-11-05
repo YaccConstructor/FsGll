@@ -24,28 +24,18 @@ let mutable queuePushed = 0
 
 let mutable trampolinesCreated = 0
 
-//[<CustomEquality; CustomComparison>]
-type CharStream (s: String, ?ind) = 
-    let mutable ind = defaultArg ind 0
-    
+type InputStream<'a> (underlying: 'a seq, ind: int) = 
     member this.Ind = ind
-    member this.IsEmpty = ind >= s.Length
-    member this.Head() = s.[ind]
-    member this.Drop x = new CharStream(s, ind + x)
-    //member this.Take x = if ind + x > s.Length then "" else s.Substring(ind, x)
-    member this.Take x = s.Substring(ind, min (s.Length - ind) x)
-    override this.Equals (that) = 
-        match that with 
-        | :? CharStream as that -> this.Ind = that.Ind
-        | _                     -> false
-
-    override this.GetHashCode() = hash (ind)
-    override this.ToString() = "CharStream(ind:" + string ind + "|" + s.Substring(ind) + ")"
-
-type InputStream<'a> (underlying: 'a seq) = 
     member this.Head = Seq.head underlying
     member this.IsEmpty = Seq.isEmpty underlying
-    member this.Drop x = new InputStream<_>(Seq.skip x underlying)
+    member this.Drop x = new InputStream<_>(Seq.skip x underlying, ind + x)
+    override this.ToString() = underlying |> Seq.map (fun x -> x.ToString()) |> Seq.fold (+) "" 
+    override this.Equals that = 
+        match that with
+        | :? InputStream<'a> as s -> ind = s.Ind
+        | _ -> false
+    override this.GetHashCode() = ind.GetHashCode()
+
 
 [<AbstractClass>]
 type GParserResult<'a> (tail: InputStream<'a>) = 
@@ -59,7 +49,7 @@ type GSuccess<'a, 'r when 'r: equality> (value: 'r, tail: InputStream<'a>) =
     override this.Succeeded = true
     member this.Data = (value, tail)
     member this.Value = value
-    override this.ToString() = sprintf "SUCC(%A)" this.Data
+    override this.ToString() = sprintf "SUCC(%A|%A)" value tail
     override this.Equals that = 
         match that with 
         | :? GSuccess<'a, 'r> as that -> value = that.Value && tail = that.Tail
@@ -128,7 +118,9 @@ and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () =
         let failures = new HashSet<GParserResult<'a> > ()
 
         this.Chain(t, inp) (fun res ->
-            if res.Succeeded && res.Tail.IsEmpty then successes.Add(res) |> ignore
+            if res.Succeeded && res.Tail.IsEmpty then 
+                //if anySuccess then t.Stop()
+                successes.Add(res) |> ignore
             elif res.Succeeded then failure "UnexpectedTrailingChars" (res.Tail) |> failures.Add |> ignore
             else res |> failures.Add |> ignore
         )
@@ -235,24 +227,9 @@ and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Pa
     //interface IComparable with
         //member x.CompareTo y = compare (x.GetHashCode()) (y.GetHashCode())
 
-//and LiteralParser(c: char) = CharParser ()
-//    inherit TerminalParser<char>()B
-//    override this.Parse (inp: CharStream) = 
-//        if inp.IsEmpty 
-//        then Failure "UnexpectedEOF"
-//        else if inp.Head() = c then Success (c, inp.Drop 1) else Failure("Unexpected character")
-
-//and PredicateParser<'a when 'a : equality>(pred: 'a -> bool) = 
-//    inherit TerminalParser<'a, 'a>()
-//    override this.Parse (s: InputStream<'a>) : GParserResult<'a> = failure<'a> "aaa" s
-//        if s.IsEmpty then failure<'a> "UnexpectedEOF" s
-//        else
-//            let h = s.Head
-//            if h |> pred then success<_, _> h (s.Drop 1)
-//            else failure<'a> (sprintf "Unexpected token '%A'" h) s
-
 and Trampoline<'a>() as tram =
     // R
+    let postrace = new ResizeArray<string>()
     let _queue = new ResizeArray<GParser<'a> * InputStream<'a>>()
 
     // U_j
@@ -267,6 +244,8 @@ and Trampoline<'a>() as tram =
     // prevents divergence in cyclic GSS traversal
     let saved = new HOMap<GParserResult<'a>, FSet<'a> >()
 
+    let mutable stopped = false
+    
     let hasNext() = _queue.Count > 0
 
     let remove() = 
@@ -278,6 +257,7 @@ and Trampoline<'a>() as tram =
 
     let step() =
         let p, s = remove()
+        //postrace.Add(sprintf "%d %A" s.Ind p)
         p.Chain (tram, s) <| fun res ->
             match popped.TryGetValue(s) with
             | true, parsers-> 
@@ -315,127 +295,195 @@ and Trampoline<'a>() as tram =
     member this.Popped = popped
     member this.Done   = _done
     member this.Backlinks = backlinks
+    member this.Postrace = postrace
+
+    member this.Stop() : unit = stopped <- true
+
     // L_0
     member this.Run () : unit =
-        while (hasNext()) do
+        while (hasNext() && not stopped) do
             step()
             
     member this.Add (p: GParser<'a>, s: InputStream<'a>) (f: GParserResult<'a> -> unit) : unit = 
         let tuple = (p, s)
-//        
-//        match backlinks.TryGetValue(s) with
-//        | true, parsers-> 
-//            if not <| parsers.ContainsKey(p) then 
-//                backlinks.[s].Add(p, new HashSet<(GParserResult<'a> -> unit)>() )
-//        | _, _ ->
-//            backlinks.Add(s, new HOMap<GParser<'a>, FSet<'a> >() )
-//            backlinks.[s].Add(p, new FSet<'a>() )
-//
-//        backlinks.[s].[p].Add(f) |> ignore
-//
-//        match popped.TryGetValue(s) with
-//        | true, parsers when parsers.ContainsKey p ->
-//            //foundInPopped <- foundInPopped + 1
-//            parsers.[p] |> Seq.iter(fun res ->            // if we've already done that, use the result
-//                //trace(sprintf "Revisited: %A *=> %A\n" tuple res)
-//                f res
-//            )
-//        | _ ->
-//            notFoundInPopped <- notFoundInPopped + 1
-//            let addTuple(parsers: HashSet<GParser<'a> >) = 
-//                //notFoundInDone <- notFoundInDone + 1
-//                _queue.Add(tuple)
-//                parsers.Add(p) |> ignore
-//                //trace("Added: ")
-//                //queuePushed <- queuePushed + 1
-//
-//            match _done.TryGetValue(s) with
-//            | true, parsers ->
-//                if not <| parsers.Contains (p) then 
-//                    addTuple(parsers) 
-//            | _, _ ->
-//                let parsers = new HashSet<GParser<'a> >()
-//                _done.Add(s, parsers)
-//                //savedToDone <- savedToDone + 1
-//                addTuple(parsers)
+        
+        match backlinks.TryGetValue(s) with
+        | true, parsers-> 
+            if not <| parsers.ContainsKey(p) then 
+                backlinks.[s].Add(p, new HashSet<(GParserResult<'a> -> unit)>() )
+        | _, _ ->
+            backlinks.Add(s, new HOMap<GParser<'a>, FSet<'a> >() )
+            backlinks.[s].Add(p, new FSet<'a>() )
+
+        backlinks.[s].[p].Add(f) |> ignore
+
+        match popped.TryGetValue(s) with
+        | true, parsers when parsers.ContainsKey p ->
+            //foundInPopped <- foundInPopped + 1
+            parsers.[p] |> Seq.iter(fun res ->            // if we've already done that, use the result
+                //trace(sprintf "Revisited: %A *=> %A\n" tuple res)
+                f res
+            )
+        | _ ->
+            notFoundInPopped <- notFoundInPopped + 1
+            let addTuple(parsers: HashSet<GParser<'a> >) = 
+                //notFoundInDone <- notFoundInDone + 1
+                _queue.Add(tuple)
+                parsers.Add(p) |> ignore
+                //trace("Added: ")
+                //queuePushed <- queuePushed + 1
+
+            match _done.TryGetValue(s) with
+            | true, parsers ->
+                if not <| parsers.Contains (p) then 
+                    addTuple(parsers) 
+            | _, _ ->
+                let parsers = new HashSet<GParser<'a> >()
+                _done.Add(s, parsers)
+                //savedToDone <- savedToDone + 1
+                addTuple(parsers)
         ()
 
 #nowarn "1189"
 
-let preturn<'a, 'r when 'r: equality> (a: 'r) = 
-    { new TerminalParser<'a, 'r>() with override this.Parse inp = success<'a, 'r> a inp } :> Parser<'a, 'r>
+let preturn<'a, 'r when 'r: equality> (a: 'r) : Parser<'a, 'r> = 
+    { new TerminalParser<'a, 'r>() 
+      with override this.Parse inp = success<'a, 'r> a inp } :> Parser<'a, 'r>
 
-let predicate<'a when 'a: equality> (pred : 'a -> bool) = 
+let perror<'a, 'r when 'r: equality> (msg: string) : Parser<'a, 'r> = 
+    { new TerminalParser<'a, 'r>() 
+      with override this.Parse inp = failure<'a> msg inp } :> Parser<'a, 'r>
+
+let satisfy<'a when 'a: equality> (pred : 'a -> bool) = 
     { new TerminalParser<'a, 'a>() with 
       override this.Parse (s: InputStream<'a>) =
         if s.IsEmpty then failure<'a> "UnexpectedEOF" s
         else
             let h = s.Head
             if h |> pred then success<'a, 'a> h (s.Drop 1)
-            else failure<'a> (sprintf "Unexpected token '%A'" h) s }
+            else failure<'a> "Unexpected token" s }
 
-let (>>=)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> p (fn:'r -> Parser<'a, 'r2>) = 
-    { new NonTerminalParser<'a, 'r option>() with 
+let (>>=)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (fn: 'r -> Parser<'a, 'r2>) : Parser<'a, 'r2> = 
+    { new NonTerminalParser<'a, 'r2>() with 
       override nt.Chain(t, inp) (cont) = 
-            t.Add(p, inp) (fun res -> 
-                match res with 
+            t.Add(p, inp) (function 
+                | :? GSuccess<'a, 'r> as succ1 -> fn(succ1.Value).Chain(t, succ1.Tail) (cont)
+                | fail -> cont fail)
+    } :> Parser<'a, 'r2>
+
+let many1<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
+    { new NonTerminalParser<'a, 'r list>() with 
+        override nt.Chain(t, inp) (f) = 
+            t.Add(this, inp) (function
                 | :? GSuccess<'a, 'r> as succ1 -> 
-                    fn(succ1.Value).Chain(t, succ1.Tail) (fun res -> 
-                        match res with
-                        | :? GSuccess<'a, 'r2> as succ2 -> 
-                            success<'a, _> succ2.Value succ2.Tail |> cont
-                        | fail -> fail |> cont
+                    success<'a, 'r list> [succ1.Value] succ1.Tail |> f
+                    t.Add(nt, succ1.Tail) (function
+                        | :? GSuccess<'a, 'r list> as succ2 -> 
+                            success (succ1.Value :: succ2.Value) succ2.Tail |> f
+                        | fail -> f fail
                     )
-                | fail -> cont fail
+                | fail -> f fail
             )
-    } :> Parser<'a, _>
+    } :> Parser<'a, 'r list>
 
+let many<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
+    { new NonTerminalParser<'a, 'r list>() with 
+        override nt.Chain(t, inp) (f) = 
+            success<'a, 'r list> [] inp |> f
+            t.Add(many1 this, inp) (f)
+    } :> Parser<'a, 'r list>
 
-//let (|>>) p f = p >>= 
+let opt<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
+    { new NonTerminalParser<'a, 'r option>() with 
+        override nt.Chain(t, inp) (f) = 
+            success<'a, 'r option> None inp |> f
+            t.Add(this, inp) (function
+                | :? GSuccess<'a, 'r> as succ1 -> success (Some succ1.Value) succ1.Tail |> f
+                | fail -> f fail)
+    } :> Parser<'a, 'r option>
 
-//let (.^)<'a, 'r, 'rr when 'r : equality and 'rr : equality> (p: Parser<'a, 'r>) (f: 'r -> 'rr) =
-//    p.MapWithTail (fun (_, r) -> f r)
-
-//let (-~-)<'r, 'r2 when 'r : equality and 'r2 : equality> (a: Parser<'r>) (b: Parser<'r2>) = new SequentialParser<_, _>(a, b) :> Parser<_>
+let epsilon<'a> = preturn ()
 
 let (<|>)<'a, 'r when 'r : equality> (a: Parser<'a, 'r>) (b: Parser<'a, 'r>) = 
     new DisjunctiveParser<'a, 'r>(a, b) :> Parser<'a, 'r>
 
+let (<|>%) p x = p <|> preturn x
+
+let (<?>) p msg = p <|> perror msg
+
 let (>>%) this x = this >>= fun _ -> preturn x
-let (.>>) this that = this >>= fun _ -> that
-let (>>.) this that = that >>= fun x -> that >>% x
 
-//let many1<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
-//    { new NonTerminalParser<'a, 'r list>() with 
-//        override nt.Chain(t, inp) (f) = 
-//            t.Add(this, inp) (fun res ->
-//                match res with
-//                | :? GSuccess<'r> as succ1 -> 
-//                    success [succ1.Value] succ1.Tail |> f
-//                    t.Add(nt, succ1.Tail) (fun res -> 
-//                        match res with 
-//                        | :? GSuccess<'r list> as succ2 -> success (succ1.Value :: succ2.Value) succ2.Tail |> f
-//                        | fail -> f fail
-//                    )
-//                | fail -> f fail
-//            )
-//    } :> Parser<'a, _>
+//let (.>>)<'a, 'r1, 'r2 when 'r1: equality and 'r2: equality> (p: Parser<'a, 'r1>) (q: Parser<'a, 'r2>) = 
+//    p >>= fun (x: 'r1) -> q >>% x
+let (.>>)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (q: Parser<'a, 'r2>) : Parser<'a, 'r> = 
+    { new NonTerminalParser<'a, 'r>() with 
+      override nt.Chain(t, inp) (cont) = 
+            t.Add(p, inp) 
+                (function
+                 | :? GSuccess<'a, 'r> as s1 -> 
+                     q.Chain(t, s1.Tail) 
+                         (fun r2 -> cont (if r2.Succeeded then success<'a, 'r> s1.Value r2.Tail else r2))
+                 | f -> cont f)
+    } :> Parser<'a, 'r>
 
-//let opt<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
-//    { new NonTerminalParser<'a, 'r option>() with 
-//        override nt.Chain(t, inp) (f) = 
-//            success<'a, 'r option> None inp |> f
-//            t.Add(this, inp) (fun res -> 
-//                match res with 
-//                | :? GSuccess<'r> as succ1 -> success (Some succ1.Value) succ1.Tail |> f
-//                | fail -> f fail
-//            )
-//    } :> Parser<'a, _>
+//let (>>.) this that = this >>= fun _ -> that
+let (>>.)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (q: Parser<'a, 'r2>) : Parser<'a, 'r2> = 
+    { new NonTerminalParser<'a, 'r2>() with 
+      override nt.Chain(t, inp) (cont) = 
+          t.Add(p, inp) (fun r -> if r.Succeeded then q.Chain(t, r.Tail) (cont) else cont r)
+    } :> Parser<'a, 'r2>
 
-//let many<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) : Parser<'a, 'r list> = (this |> many1 |> opt) .^ (function Some x -> x | _ -> [])
+let (.>>.) p1 p2 = 
+    p1 >>= fun a ->
+    p2 >>= fun b -> preturn (a, b)
 
-let epsilon<'a> = preturn ()
+let between popen pclose (p: Parser<'a, 'r>) : Parser<'a, 'r> = 
+    popen >>. p .>> pclose
 
+//let (|>>) p fn = p >>= (preturn << fn)
+let (|>>)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) fn = 
+    match p with 
+    | :? TerminalParser<'a, 'r> as p -> 
+        { new TerminalParser<'a, 'r2>() with 
+          override this.Parse(inp) =
+              match p.Parse(inp) with
+              | :? GSuccess<'a, 'r> as s1 -> success<'a, 'r2> (fn s1.Value) s1.Tail
+              | fail -> fail
+        } :> Parser<'a, 'r2>
+    | _ -> 
+        { new NonTerminalParser<'a, 'r2>() with 
+          override nt.Chain(t, inp) (cont) = 
+              t.Add(p, inp) (function
+                        | :? GSuccess<'a, 'r> as s1 -> success<'a, 'r2> (fn s1.Value) s1.Tail |> cont
+                        | fail -> cont fail)
+        } :> Parser<'a, 'r2>
+
+let pipe2 p1 p2 fn = 
+    p1 >>= fun a ->
+    p2 >>= fun b -> preturn (fn a b)
+
+let pipe3 p1 p2 p3 fn = 
+    p1 >>= fun a ->
+    p2 >>= fun b ->
+    p3 >>= fun c -> preturn (fn a b c)
+
+let pipe4 p1 p2 p3 p4 fn = 
+    p1 >>= fun a ->
+    p2 >>= fun b ->
+    p3 >>= fun c -> 
+    p4 >>= fun d -> preturn (fn a b c d)
+
+let sepBy (p: Parser<'a, 'r>) sep : Parser<'a, 'r list> = 
+    pipe2 p (many (sep >>. p)) (fun hd tl -> hd :: tl) <|>% []
+
+let notFollowedBy (p: TerminalParser<'a, 'r>) : Parser<'a, unit> = 
+    { new NonTerminalParser<'a, unit> () with
+      override this.Chain(t, inp) (f) =
+          let res = p.Parse(inp)
+          if res.Failed then success<'a, unit> () inp |> f
+          else failure "SyntaxError (notFollowedBy)" inp |> f
+    } :> Parser<'a, unit>
+    
 let private dummyParser<'a, 'r when 'r : equality> = 
    { new TerminalParser<'a, 'r>()
      with override this.Parse (inp: InputStream<'a>) = failwith "Used dummyParser" } :> Parser<'a, 'r>
@@ -443,6 +491,4 @@ let private dummyParser<'a, 'r when 'r : equality> =
 let createParserForwardedToRef<'a, 'r when 'r : equality>(name:string) = 
     let r = ref dummyParser<'a, 'r>
     { new NonTerminalParser<'a, 'r>() with 
-        override this.Chain(t, inp) (f) =
-            //printfn "%A" name 
-            (!r).Chain(t, inp) (f) } :> Parser<'a, 'r>, r
+      override this.Chain(t, inp) (f) = (!r).Chain(t, inp) (f) } :> Parser<'a, 'r>, r

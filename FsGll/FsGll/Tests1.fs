@@ -4,7 +4,8 @@ open Parsers
 //open Parsersok
 open FSharpx.Prelude
 open System.Diagnostics
-open Tests1
+open FSharp.Charting
+open System.Windows.Forms
 
 let inline  curry3 f a b c = f (a, b, c)
 
@@ -21,24 +22,24 @@ let revhash a =
     |> Seq.map (flip (/) 9L)
     |> Seq.toList
 
-let badGrammar () = 
+let badGrammar (n: int) = 
     let digit = str "0"
     let expr, exprRef = createParserForwardedToRef<string>("expr")
     exprRef := 
             (expr -~- expr ^^ (fun a b -> a + b))
         <|> (digit)
 
-    let br0 =  str "(" .>> (many << str) " "
-    let br1 =  str ")" .>> (many << str) " "
-    let brS, brSRef = createParserForwardedToRef<_>("")
-    brSRef := 
-            (br0 -~- brS -~- br1 ^^^ (fun a b c -> a + b + c)) 
-        <|> (epsilon .^ konst "") 
-        <|> (brS -~- brS ^^ (+))
+//    let br0 =  str "(" .>> (many << str) " "
+//    let br1 =  str ")" .>> (many << str) " "
+//    let brS, brSRef = createParserForwardedToRef<_>("")
+//    brSRef := 
+//            (br0 -~- brS -~- br1 ^^^ (fun a b c -> a + b + c)) 
+//        <|> (epsilon .^ konst "") 
+//        <|> (brS -~- brS ^^ (+))
 
     //let a = expr.Apply(new CharStream("011"))
     //let a = brS.Apply(new CharStream("(())()"))
-    let s = String.replicate 100 "0"
+    let s = String.replicate n "0"
     printfn "Input length: %A" (String.length s)
     apply expr (new CharStream(s))
 
@@ -182,17 +183,35 @@ let rungll1 () =
 
 let runExample () = 
     //rungll1() 
-    let sw = new Stopwatch()
     
-    printfn "Started"
-    sw.Start()
     
-    let a = goodGrammar1()
-    //let a = badGrammar()
+    //printfn "Started"
+    
+    
+    //let a = goodGrammar1()
+    let ev1 = new Event<(int * int) list>()
+    let chartData = new ResizeArray<int * int>()
+    let chart = LiveChart.Line(ev1.Publish)
+    //let chart = Chart.Line([ for x in 0 .. 10 -> x, x*x ])
+    
+    (new System.Threading.Thread(fun () -> 
+        System.Threading.Thread.Sleep(500)
+        for i in 0 .. 100 do 
+            let sw = new Stopwatch()
+            sw.Start()
+            let x = 50 + i * 2
+            let a = badGrammar(x)
+            let elaps = sw.Elapsed
+            chartData.Add(x, elaps.TotalMilliseconds |> int)
+            ev1.Trigger (chartData.ToArray() |> Array.toList)
+            printfn "Done: %A, time: %A" (List.length a) sw.Elapsed
+    )).Start()
 
-    printfn "Finished"
-    printfn "Done: %A, time: %A" (List.length a) sw.Elapsed
-    a |> List.sortBy (function Failure (x, y) -> y.Ind | _ -> 0) |> List.iter (printfn "%A")
+    Application.Run(chart.ShowChart())
+    
+    //printfn "Finished"
+//    printfn "Done: %A, time: %A" (List.length a) sw.Elapsed
+//    a |> List.sortBy (function Failure (x, y) -> y.Ind | _ -> 0) |> List.iter (printfn "%A")
 
 //    printfn ("All done!\n\
 //  trampolinesCreated: %d\n\

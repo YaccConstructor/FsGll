@@ -1,0 +1,6 @@
+﻿{
+  "firstName": "John",
+  "lastName": "Smith",
+  "isAlive": true,
+  "age": 25
+}
