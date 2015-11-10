@@ -9,7 +9,7 @@ let tok c = satisfy ((=)c)
 let badGrammar (n: int) = 
     let digit = tok '0' |>> string
     let expr, exprRef = createParserForwardedToRef<_, string>("expr")
-    exprRef :=  (pipe2 expr expr (fun a b -> a + b)) <|> (digit)
+    exprRef :=  (pipe2 expr expr (+)) <|> (digit)
     
     let s = String.replicate n "0"
     printfn "Input length: %A" (String.length s)
@@ -18,5 +18,9 @@ let badGrammar (n: int) =
     expr.Apply (new InputStream<_>(s, 0))
 
 let runExample () = 
-    let a = badGrammar(4)
+    let sw = new Stopwatch()
+    sw.Start()
+    let a = badGrammar(90)
+    printfn "Done, parser time: %A" sw.Elapsed
     printfn "%A" a
+    
