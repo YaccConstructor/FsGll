@@ -1,3 +1,5 @@
 NUnit
 NUnit.Runners
 FSharpx.Core
+FsLexYacc
+NUnitTestAdapter

@@ -9,6 +9,9 @@ NUGET
     FSharpVSPowerTools.Core (2.1.0)
       FSharp.Compiler.Service (>= 1.4.0.6)
     FSharpx.Core (1.8.41)
+    FsLexYacc (6.1.0)
+      FsLexYacc.Runtime (>= 6.1.0)
+    FsLexYacc.Runtime (6.1.0)
     Microsoft.Bcl (1.1.10)
       Microsoft.Bcl.Build (>= 1.0.14)
     Microsoft.Bcl.Build (1.0.21) - import_targets: false
@@ -17,6 +20,7 @@ NUGET
       Microsoft.Bcl.Build (>= 1.0.14)
     NUnit (2.6.4)
     NUnit.Runners (2.6.4)
+    NUnitTestAdapter (2.0.0)
     Octokit (0.16.0)
       Microsoft.Net.Http
     SourceLink.Fake (1.1.0)

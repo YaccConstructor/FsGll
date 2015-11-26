@@ -6,44 +6,27 @@ open System.Collections
 open System.Collections.Generic
 open FSharpx.Prelude
 open System.Threading
+open FsGll.InputStream
 
+let msgLibraryError = "Error in FsGll library."
+let msgDummyUsed = "Parser created with createParserForwardedToRef is not defined"
 
 //let trace s = printfn "%s" s
 let trace _ = ()
-
-let mutable foundInDone = 0
-let mutable notFoundInDone = 0
-let mutable savedToPopped = 0
-let mutable foundInPopped = 0
-let mutable notFoundInPopped = 0
-let mutable savedToDone = 0
-
-let mutable foundInSaved = 0
-let mutable savedToSaved = 0
-
-let mutable queuePushed = 0
-
-let mutable trampolinesCreated = 0
-
-type InputStream<'a> (underlying: 'a seq, ind: int) = 
-    member this.Ind = ind
-    member this.Head = Seq.head underlying
-    member this.IsEmpty = Seq.isEmpty underlying
-    member this.Drop x = new InputStream<_>(Seq.skip x underlying, ind + x)
-    override this.ToString() = underlying |> Seq.map (fun x -> x.ToString()) |> Seq.fold (+) "" 
-
-    // It looks like F# Collections.Set<_> uses only IComparable interface and 
-    // forgets about check objects equality with .Equals, so dirty hacks is necessary
-    override this.Equals that = 
-        match that with
-        | :? InputStream<'a> as s -> ind = s.Ind
-        | _ -> false
-    override this.GetHashCode() = ind.GetHashCode()
-    interface IComparable with
-        override this.CompareTo that =
-            match that with 
-            | :? InputStream<'a> as that -> this.Ind - that.Ind
-            | _ -> invalidArg "that" "Can not compare"
+//
+//let mutable foundInDone = 0
+//let mutable notFoundInDone = 0
+//let mutable savedToPopped = 0
+//let mutable foundInPopped = 0
+//let mutable notFoundInPopped = 0
+//let mutable savedToDone = 0
+//
+//let mutable foundInSaved = 0
+//let mutable savedToSaved = 0
+//
+//let mutable queuePushed = 0
+//
+//let mutable trampolinesCreated = 0
 
 // dirty hack to overcome Set problem
 type Unique() =
@@ -106,7 +89,7 @@ let parserResult<'a, 'r when 'r: equality> (r: GParserResult<'a>) =
     match r with
     | :? GSuccess<'a, 'r> as succ -> Success (succ.Value)
     | :? GFailure<'a> as fail -> Failure (fail.Message)
-    | _ -> failwith "impossible"
+    | _ -> failwith msgLibraryError
 
 
 let mutable private gParserAutoincrement = 0
@@ -298,7 +281,7 @@ let satisfy<'a when 'a: equality> (pred : 'a -> bool) =
         if s.IsEmpty then failure<'a> "UnexpectedEOF" s
         else
             let h = s.Head
-            if h |> pred then success<'a, 'a> h (s.Drop 1)
+            if h |> pred then success<'a, 'a> h (s.Drop)
             else failure<'a> "Unexpected token" s }
 
 let (>>=)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (fn: 'r -> Parser<'a, 'r2>) : Parser<'a, 'r2> = 
@@ -415,9 +398,14 @@ let notFollowedBy (p: TerminalParser<'a, 'r>) : Parser<'a, unit> =
     } :> Parser<'a, unit>
     
 let private dummyParser<'a, 'r when 'r : equality> = 
-   { new TerminalParser<'a, 'r>() with override this.Parse s = failwith "DummyParser" } :> Parser<'a, 'r>
+   { new TerminalParser<'a, 'r>() with override this.Parse s = failwith msgDummyUsed } :> Parser<'a, 'r>
 
 let createParserForwardedToRef<'a, 'r when 'r : equality>(name:string) = 
     let r = ref dummyParser<'a, 'r>
     { new NonTerminalParser<'a, 'r>() with 
       override this.Chain(t, inp) (f) = (!r).Chain(t, inp) (f) } :> Parser<'a, 'r>, r
+
+let runParser (p: Parser<'a, 'r>) (s: 'a seq) : ParserResult<'r> list = 
+    let res = p.Apply(new ArrayInputStream<'a>(Seq.toArray s, 0))
+    if res.IsEmpty then failwith msgLibraryError
+    res |> List.map parserResult<'a, 'r>

@@ -2,9 +2,11 @@ source https://nuget.org/api/v2
 
 nuget FSharp.Formatting
 nuget FSharpx.Core
+nuget FsLexYacc
 nuget NUnit 
 nuget NUnit.Runners
 nuget FAKE
+nuget NUnitTestAdapter
 nuget SourceLink.Fake
 
 github fsharp/FAKE modules/Octokit/Octokit.fsx
