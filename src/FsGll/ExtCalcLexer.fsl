@@ -1,0 +1,43 @@
+{
+module FsGll.ExtCalcLexer 
+
+open System
+open Microsoft.FSharp.Text.Lexing
+
+type Lexem = 
+    | EOF
+    | COMMA
+    | INT of int
+    | FLOAT of float
+    | IDENTIFIER of string
+    | PLUS | EQ | LT | LE | GT | GE
+
+let ops =
+    [
+        "+",    PLUS;
+        "=",    EQ;
+        "<",    LT;
+        "<=",   LE;
+        ">",    GT;
+        ">=",   GE;
+    ] |> Map.ofList
+}	
+
+let char        = ['a'-'z' 'A'-'Z']   
+let digit       = ['0'-'9']   
+let int         = '-'?digit+   
+let float       = '-'?digit+ '.' digit+   
+let identifier  = char(char|digit|['_'])*
+let whitespace  = [' ' '\t']
+let newline     = "\n\r" | '\n' | '\r'
+let operator    = "+" | ">" | ">=" | "<" | "<=" | "="
+
+rule tokenize = parse
+| whitespace    { tokenize lexbuf }   
+| newline       { lexbuf.EndPos <- lexbuf.EndPos.NextLine; tokenize lexbuf; }   
+| float         { FLOAT(Double.Parse(LexBuffer<_>.LexemeString lexbuf)) }
+| int           { INT(Int32.Parse(LexBuffer<_>.LexemeString lexbuf)) }
+| identifier    { IDENTIFIER(LexBuffer<_>.LexemeString lexbuf) }
+| operator      { ops.[LexBuffer<_>.LexemeString lexbuf] }
+| ','           { COMMA }
+| eof           { EOF }
