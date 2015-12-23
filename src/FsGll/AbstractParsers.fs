@@ -5,7 +5,7 @@ open System.IO
 open System.Collections
 open System.Collections.Generic
 open FSharpx.Prelude
-
+open FsGll.InputStream
 
 //let trace s = printfn "%s" s
 let trace _ = ()
@@ -23,18 +23,6 @@ let mutable savedToSaved = 0
 let mutable queuePushed = 0
 
 let mutable trampolinesCreated = 0
-
-type InputStream<'a> (underlying: 'a seq, ind: int) = 
-    member this.Ind = ind
-    member this.Head = Seq.head underlying
-    member this.IsEmpty = Seq.isEmpty underlying
-    member this.Drop x = new InputStream<_>(Seq.skip x underlying, ind + x)
-    override this.ToString() = underlying |> Seq.map (fun x -> x.ToString()) |> Seq.fold (+) "" 
-    override this.Equals that = 
-        match that with
-        | :? InputStream<'a> as s -> ind = s.Ind
-        | _ -> false
-    override this.GetHashCode() = ind.GetHashCode()
 
 
 [<AbstractClass>]
@@ -330,7 +318,7 @@ let satisfy<'a when 'a: equality> (pred : 'a -> bool) =
         if s.IsEmpty then failure<'a> "UnexpectedEOF" s
         else
             let h = s.Head
-            if h |> pred then success<'a, 'a> h (s.Drop 1)
+            if h |> pred then success<'a, 'a> h (s.Drop)
             else failure<'a> "Unexpected token" s }
 
 let (>>=)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (fn: 'r -> Parser<'a, 'r2>) : Parser<'a, 'r2> = 
@@ -441,8 +429,10 @@ let pipe4 p1 p2 p3 p4 fn =
     p3 >>= fun c -> 
     p4 >>= fun d -> preturn (fn a b c d)
 
-let sepBy (p: Parser<'a, 'r>) sep : Parser<'a, 'r list> = 
-    pipe2 p (many (sep >>. p)) (fun hd tl -> hd :: tl) <|>% []
+let sepBy1 (p: Parser<'a, 'r>) sep : Parser<'a, 'r list> = 
+    pipe2 p (many (sep >>. p)) (fun hd tl -> hd :: tl) 
+
+let sepBy (p: Parser<'a, 'r>) sep : Parser<'a, 'r list> = sepBy1 p sep <|>% []
 
 let notFollowedBy (p: TerminalParser<'a, 'r>) : Parser<'a, unit> = 
     { new NonTerminalParser<'a, unit> () with
