@@ -7,6 +7,7 @@ open System.Collections.Generic
 open FSharpx.Prelude
 open System.Threading
 open FsGll.InputStream
+open FsGll.Parsers
 
 let msgLibraryError = "Error in FsGll library."
 let msgDummyUsed = "Parser created with createParserForwardedToRef is not defined"
@@ -29,70 +30,7 @@ let trace _ = ()
 //let mutable trampolinesCreated = 0
 
 // dirty hack to overcome Set problem
-type Unique() =
-    static let mutable (au : int) = 0
-    let uid : int = Interlocked.Increment(&au)
-    member this.Uid = uid
 
-    // Some dirty code to store Unique in Set
-    interface IComparable with 
-        override this.CompareTo that = 
-            if this.Equals(that) then 0
-            else 
-                match that with 
-                | :? Unique as that -> 
-                    let h1, h2 = this.GetHashCode(), that.GetHashCode()
-                    if h1 <> h2 then h1 - h2 else uid - that.Uid 
-                | _ -> invalidArg "that" "Can not compare"
-    override this.Equals _ = false 
-    override this.GetHashCode() = uid.GetHashCode()
-
-[<AbstractClass>]
-type GParserResult<'a> (tail: InputStream<'a>) = 
-    inherit Unique()
-    abstract member Succeeded : bool
-    member this.Failed = not this.Succeeded
-    member this.Tail = tail
-    
-type GSuccess<'a, 'r when 'r: equality> (value: 'r, tail: InputStream<'a>) = 
-    inherit GParserResult<'a>(tail)
-    let myhash = lazy (hash value + hash tail)
-    override this.Succeeded = true
-    member this.Value = value
-    override this.ToString() = sprintf "SUCC(%A|%A)" value tail
-    override this.Equals that = 
-        match that with 
-        | :? GSuccess<'a, 'r> as that -> value = that.Value && tail = that.Tail
-        | _ -> false
-    override this.GetHashCode() = myhash.Value
-
-type GFailure<'a> (msg: string, tail: InputStream<'a>) = 
-    inherit GParserResult<'a> (tail)
-    let myhash = lazy (hash msg + hash tail)
-    override this.Succeeded = false
-    member this.Message = msg
-    override this.Equals that = 
-        match that with 
-        | :? GFailure<'a> as that -> msg = that.Message && tail = that.Tail
-        | _ -> false
-    override this.GetHashCode() = myhash.Value
-    override this.ToString() = sprintf "FAIL(m:%s|%A)" msg tail
-
-let success<'a, 'r when 'r: equality> value tail = new GSuccess<'a, 'r>(value, tail) :> GParserResult<_>
-let failure<'a> msg tail = new GFailure<'a>(msg, tail) :> GParserResult<'a>
-
-type ParserResult<'r> = 
-   | Success of value: 'r
-   | Failure of msg: string
-
-let parserResult<'a, 'r when 'r: equality> (r: GParserResult<'a>) = 
-    match r with
-    | :? GSuccess<'a, 'r> as succ -> Success (succ.Value)
-    | :? GFailure<'a> as fail -> Failure (fail.Message)
-    | _ -> failwith msgLibraryError
-
-
-let mutable private gParserAutoincrement = 0
 let mutable private disjunctiveParserChainInvokations = 0
 
 type Cont() = 
@@ -127,6 +65,59 @@ and [<AbstractClass>] GParser<'a> () =
 and [<AbstractClass>] Parser<'a, 'r when 'r : equality> () = 
     inherit GParser<'a> ()
     abstract member Apply : InputStream<'a> -> GParserResult<'a> list
+    abstract member _Map<'r2 when 'r2: equality> : ('r -> 'r2) -> IParser<'a, 'r2>
+    member p._Many1 = 
+        { new NonTerminalParser<'a, 'r list>() with 
+            override nt.Chain(t, inp) (f) = 
+                t.Add(p, inp) (Cont.New (fun (t, r) -> 
+                    match r with
+                    | :? GSuccess<'a, 'r> as s1 -> 
+                        let t = (t, success<'a, 'r list> [s1.Value] s1.Tail) |> f.F
+                        t.Add(nt, s1.Tail) (Cont.WithSucc (fun s2 -> success<'a, 'r list> (s1.Value :: s2.Value) s2.Tail) f)
+                    | fail -> (t, fail) |> f.F
+                ))
+        } :> Parser<'a, 'r list>
+    
+
+    interface IParser<'a, 'r> with
+        override p.Chain<'t, 'cont, 'cres> ((t, s) : 't * InputStream<'a>) (c: 'cont) = 
+            (p.Chain((t :> obj) :?> Trampoline<'a>, s) ((c :> obj) :?> Continuation<'a>)) :> obj :?> 'cres
+
+        override p.Many1 = p._Many1 :> IParser<_,_>
+        override p.Bind fn = 
+            { new NonTerminalParser<'a, 'r2>() with 
+              override nt.Chain(t, inp) (cont) = 
+                    t.Add(p, inp) (Cont.New (fun (t, res) -> 
+                        match res with 
+                        | :? GSuccess<'a, 'r> as succ1 -> fn(succ1.Value).Chain(t, succ1.Tail) (cont)
+                        | fail -> (t, fail) |> cont.F))
+            } :> IParser<'a, 'r2>
+        override p.Or(q) = new DisjunctiveParser<'a, 'r>(p, (q :> obj :?> Parser<'a, 'r>)) :> IParser<_,_>
+        override p.Many = 
+            { new NonTerminalParser<'a, 'r list>() with 
+                override nt.Chain (t, s) f =
+                    let t = (t, success<'a, 'r list> [] s) |> f.F
+                    t.Add(p._Many1, s) f
+            } :> IParser<'a, 'r list>
+        override p.First q =
+            { new NonTerminalParser<'a, 'r>() with 
+              override nt.Chain(t, inp) (f) = 
+                    t.Add(p, inp) (Cont.New(fun (t, r) ->
+                         match r with 
+                         | :? GSuccess<'a, 'r> as s1 -> 
+                             q.Chain(t, s1.Tail) (Cont.WithSucc (fun s -> success<'a, 'r> s1.Value s.Tail) f)
+                         | fail -> (t, fail) |> f.F))
+            } :> IParser<'a, 'r>
+        override p.Second<'r2 when 'r2 : equality> q = 
+            { new NonTerminalParser<'a, 'r2>() with 
+              override nt.Chain (t, s) f = 
+                  t.Add(p, s) (Cont.New(fun (t, r) -> if r.Succeeded then q.Chain(t, r.Tail) (f) else (t, r) |> f.F))
+            } :> IParser<'a, 'r2>        
+        override p.Map(fn) = p._Map(fn)
+        override p.Return<'r2 when 'r2 : equality> (a: 'r2) = 
+            { new TerminalParser<'a, 'r2>() 
+                with override tp.Parse inp = success<'a, 'r2> a inp } :> IParser<'a, 'r2>
+
 
 and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () = 
     inherit Parser<'a, 'r> ()
@@ -146,6 +137,11 @@ and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () =
         let t = t.Run()
 
         (if t.Successes.Count = 0 then t.Failures else t.Successes) |> Seq.toList
+    override p._Map(fn) = 
+        { new NonTerminalParser<'a, 'r2>() with 
+            override nt.Chain (t, s) f = 
+                t.Add(p, s) (Cont.WithSucc (fun r -> success<'a, 'r2> (fn r.Value) r.Tail) f)
+        } :> IParser<'a, 'r2>
 
 and [<AbstractClass>] TerminalParser<'a, 'r when 'r : equality> () = 
     inherit Parser<'a, 'r> ()
@@ -158,6 +154,13 @@ and [<AbstractClass>] TerminalParser<'a, 'r when 'r : equality> () =
             | x -> [x]
     
     override this.Chain (t, inp) (f) = (t, this.Parse inp) |> f.F
+    override p._Map(fn) = 
+        { new TerminalParser<'a, 'r2>() with 
+            override this.Parse(s) =
+                match p.Parse(s) with
+                | :? GSuccess<'a, 'r> as r -> success<'a, 'r2> (fn r.Value) r.Tail
+                | fail -> fail
+        } :> IParser<'a, 'r2>
 
 and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Parser<'a, 'r>) as disj =
     inherit NonTerminalParser<'a, 'r>()
@@ -267,15 +270,11 @@ and Trampoline<'a> = {
 
 #nowarn "1189"
 
-let preturn<'a, 'r when 'r: equality> (a: 'r) : Parser<'a, 'r> = 
-    { new TerminalParser<'a, 'r>() 
-      with override this.Parse inp = success<'a, 'r> a inp } :> Parser<'a, 'r>
-
 let perror<'a, 'r when 'r: equality> (msg: string) : Parser<'a, 'r> = 
     { new TerminalParser<'a, 'r>() 
       with override this.Parse inp = failure<'a> msg inp } :> Parser<'a, 'r>
 
-let satisfy<'a when 'a: equality> (pred : 'a -> bool) = 
+let satisfyP<'a when 'a: equality> (pred : 'a -> bool) = 
     { new TerminalParser<'a, 'a>() with 
       override this.Parse (s: InputStream<'a>) =
         if s.IsEmpty then failure<'a> "UnexpectedEOF" s
@@ -284,33 +283,7 @@ let satisfy<'a when 'a: equality> (pred : 'a -> bool) =
             if h |> pred then success<'a, 'a> h (s.Drop)
             else failure<'a> "Unexpected token" s }
 
-let (>>=)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (fn: 'r -> Parser<'a, 'r2>) : Parser<'a, 'r2> = 
-    { new NonTerminalParser<'a, 'r2>() with 
-      override nt.Chain(t, inp) (cont) = 
-            t.Add(p, inp) (Cont.New (fun (t, res) -> 
-                match res with 
-                | :? GSuccess<'a, 'r> as succ1 -> fn(succ1.Value).Chain(t, succ1.Tail) (cont)
-                | fail -> (t, fail) |> cont.F))
-    } :> Parser<'a, 'r2>
-
-let many1<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
-    { new NonTerminalParser<'a, 'r list>() with 
-        override nt.Chain(t, inp) (f) = 
-            t.Add(this, inp) (Cont.New (fun (t, r) -> 
-                match r with
-                | :? GSuccess<'a, 'r> as s1 -> 
-                    let t = (t, success<'a, 'r list> [s1.Value] s1.Tail) |> f.F
-                    t.Add(nt, s1.Tail) (Cont.WithSucc (fun s2 -> success<'a, 'r list> (s1.Value :: s2.Value) s2.Tail) f)
-                | fail -> (t, fail) |> f.F
-            ))
-    } :> Parser<'a, 'r list>
-
-let many<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
-    { new NonTerminalParser<'a, 'r list>() with 
-        override nt.Chain (t, s) f =
-            let t = (t, success<'a, 'r list> [] s) |> f.F
-            t.Add(many1 this, s) f
-    } :> Parser<'a, 'r list>
+let satisfy p = satisfyP p :> IParser<_,_>        
 
 let opt<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
     { new NonTerminalParser<'a, 'r option>() with 
@@ -319,76 +292,15 @@ let opt<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) =
             t.Add(this, s) (Cont.WithSucc (fun r -> success (Some r.Value) r.Tail) f)
     } :> Parser<'a, 'r option>
 
-let epsilon<'a> = preturn ()
 
-let (<|>)<'a, 'r when 'r : equality> (a: Parser<'a, 'r>) (b: Parser<'a, 'r>) = 
-    new DisjunctiveParser<'a, 'r>(a, b) :> Parser<'a, 'r>
-
-let (<|>%) p x = p <|> preturn x
-
-let (<?>) p msg = p <|> perror msg
-
-let (>>%) this x = this >>= fun _ -> preturn x
+//let orP<'a, 'r when 'r : equality> (a: Parser<'a, 'r>) (b) = new DisjunctiveParser<'a, 'r>(a, b) :> Parser<'a, 'r>
 
 //let (.>>)<'a, 'r1, 'r2 when 'r1: equality and 'r2: equality> (p: Parser<'a, 'r1>) (q: Parser<'a, 'r2>) = 
 //    p >>= fun (x: 'r1) -> q >>% x
-let (.>>)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (q: Parser<'a, 'r2>) : Parser<'a, 'r> = 
-    { new NonTerminalParser<'a, 'r>() with 
-      override nt.Chain(t, inp) (f) = 
-            t.Add(p, inp) (Cont.New(fun (t, r) ->
-                 match r with 
-                 | :? GSuccess<'a, 'r> as s1 -> 
-                     q.Chain(t, s1.Tail) (Cont.WithSucc (fun s -> success<'a, 'r> s1.Value s.Tail) f)
-                 | fail -> (t, fail) |> f.F))
-    } :> Parser<'a, 'r>
 
 //let (>>.) this that = this >>= fun _ -> that
-let (>>.)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (q: Parser<'a, 'r2>) : Parser<'a, 'r2> = 
-    { new NonTerminalParser<'a, 'r2>() with 
-      override nt.Chain (t, s) f = 
-          t.Add(p, s) (Cont.New(fun (t, r) -> if r.Succeeded then q.Chain(t, r.Tail) (f) else (t, r) |> f.F))
-    } :> Parser<'a, 'r2>
-
-let (.>>.) p1 p2 = 
-    p1 >>= fun a ->
-    p2 >>= fun b -> preturn (a, b)
-
-let between popen pclose (p: Parser<'a, 'r>) : Parser<'a, 'r> = 
-    popen >>. p .>> pclose
 
 //let (|>>) p fn = p >>= (preturn << fn)
-let (|>>)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) fn = 
-    match p with 
-    | :? TerminalParser<'a, 'r> as p -> 
-        { new TerminalParser<'a, 'r2>() with 
-          override this.Parse(s) =
-              match p.Parse(s) with
-              | :? GSuccess<'a, 'r> as r -> success<'a, 'r2> (fn r.Value) r.Tail
-              | fail -> fail
-        } :> Parser<'a, 'r2>
-    | _ -> 
-        { new NonTerminalParser<'a, 'r2>() with 
-          override nt.Chain (t, s) f = 
-              t.Add(p, s) (Cont.WithSucc (fun r -> success<'a, 'r2> (fn r.Value) r.Tail) f)
-        } :> Parser<'a, 'r2>
-
-let pipe2 p1 p2 fn = 
-    p1 >>= fun a ->
-    p2 >>= fun b -> preturn (fn a b)
-
-let pipe3 p1 p2 p3 fn = 
-    p1 >>= fun a ->
-    p2 >>= fun b ->
-    p3 >>= fun c -> preturn (fn a b c)
-
-let pipe4 p1 p2 p3 p4 fn = 
-    p1 >>= fun a ->
-    p2 >>= fun b ->
-    p3 >>= fun c -> 
-    p4 >>= fun d -> preturn (fn a b c d)
-
-let sepBy (p: Parser<'a, 'r>) sep : Parser<'a, 'r list> = 
-    pipe2 p (many (sep >>. p)) (fun hd tl -> hd :: tl) <|>% []
 
 let notFollowedBy (p: TerminalParser<'a, 'r>) : Parser<'a, unit> = 
     { new NonTerminalParser<'a, unit> () with

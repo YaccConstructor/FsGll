@@ -6,6 +6,9 @@ open System.Collections
 open System.Collections.Generic
 open FSharpx.Prelude
 
+open FsGll.InputStream
+open FsGll.Parsers
+
 
 //let trace s = printfn "%s" s
 let trace _ = ()
@@ -23,76 +26,6 @@ let mutable savedToSaved = 0
 let mutable queuePushed = 0
 
 let mutable trampolinesCreated = 0
-
-type InputStream<'a> (underlying: 'a seq, ind: int) = 
-    member this.Ind = ind
-    member this.Head = Seq.head underlying
-    member this.IsEmpty = Seq.isEmpty underlying
-    member this.Drop x = new InputStream<_>(Seq.skip x underlying, ind + x)
-    override this.ToString() = underlying |> Seq.map (fun x -> x.ToString()) |> Seq.fold (+) "" 
-    override this.Equals that = 
-        match that with
-        | :? InputStream<'a> as s -> ind = s.Ind
-        | _ -> false
-    override this.GetHashCode() = ind.GetHashCode()
-
-
-[<AbstractClass>]
-type GParserResult<'a> (tail: InputStream<'a>) = 
-    abstract member Succeeded : bool
-    member this.Failed = not this.Succeeded
-    member this.Tail = tail
-    //override this.ToString() = sprintf "GPR(%A)" this.Tail
-    
-type GSuccess<'a, 'r when 'r: equality> (value: 'r, tail: InputStream<'a>) = 
-    inherit GParserResult<'a>(tail)
-    override this.Succeeded = true
-    member this.Data = (value, tail)
-    member this.Value = value
-    override this.ToString() = sprintf "SUCC(%A|%A)" value tail
-    override this.Equals that = 
-        match that with 
-        | :? GSuccess<'a, 'r> as that -> value = that.Value && tail = that.Tail
-        | _ -> false
-    override this.GetHashCode() = hash value + hash tail
-
-type GFailure<'a> (msg: string, tail: InputStream<'a>) = 
-    inherit GParserResult<'a> (tail)
-    override this.Succeeded = false
-    member this.Message = msg
-    override this.Equals that = 
-        match that with 
-        | :? GFailure<'a> as that -> msg = that.Message && tail = that.Tail
-        | _ -> false
-    override this.GetHashCode() = hash msg + hash tail
-    override this.ToString() = sprintf "FAIL(m:%s|%A)" msg tail
-
-let success<'a, 'r when 'r: equality> value tail = new GSuccess<'a, 'r>(value, tail) :> GParserResult<_>
-let failure<'a> msg tail = new GFailure<'a>(msg, tail) :> GParserResult<'a>
-
-type ParserResult<'r> = 
-   | Success of value: 'r
-   | Failure of msg: string
-
-let parserResult<'a, 'r when 'r: equality> (r: GParserResult<'a>) = 
-    match r with
-    | :? GSuccess<'a, 'r> as succ -> Success (succ.Value)
-    | :? GFailure<'a> as fail -> Failure (fail.Message)
-    | _ -> failwith "impossible"
-
-//type Failure (msg: string, tail: CharStream) = 
-//    inherit GParseResult (tail)
-//    override this.IsSucc = false
-//    member this.Data = (msg, tail)
-//    override this.Equals that = 
-//        match that with 
-//        | :? Failure as that -> this.Data = that.Data
-//        | _ -> false
-//    override this.GetHashCode() = hash (this.Data)
-
-//type ParserResult () = class end
-//type Success<'a> (value: 'a, tail: CharStream) = class inherit ParserResult () end
-//type Failure (msg: string) = class inherit ParserResult () end
 
 type Continuation<'a> = GParserResult<'a> -> unit
 type RSet<'a> = HashSet<GParserResult<'a> >
@@ -330,7 +263,7 @@ let satisfy<'a when 'a: equality> (pred : 'a -> bool) =
         if s.IsEmpty then failure<'a> "UnexpectedEOF" s
         else
             let h = s.Head
-            if h |> pred then success<'a, 'a> h (s.Drop 1)
+            if h |> pred then success<'a, 'a> h (s.Drop)
             else failure<'a> "Unexpected token" s }
 
 let (>>=)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (fn: 'r -> Parser<'a, 'r2>) : Parser<'a, 'r2> = 
@@ -452,7 +385,7 @@ let notFollowedBy (p: TerminalParser<'a, 'r>) : Parser<'a, unit> =
     } :> Parser<'a, unit>
     
 let private dummyParser<'a, 'r when 'r : equality> = 
-   { new TerminalParser<'a, 'r>() with override this.Parse s = failwith "DummyParser" } :> Parser<'a, 'r>
+   { new TerminalParser<'a, 'r>() with override this.Parse s = failwith msgDummyUsed } :> Parser<'a, 'r>
 
 let createParserForwardedToRef<'a, 'r when 'r : equality>(name:string) = 
     let r = ref dummyParser<'a, 'r>

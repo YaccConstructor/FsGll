@@ -115,7 +115,7 @@
     <None Include="paket.references" />
     <None Include="paket.template" />
     <Compile Include="InputStream.fs" />
-    <Compile Include="AbstractParsers.fs" />
+    <Compile Include="Parsers.fs" />
     <Compile Include="PureParsers.fs" />
     <Compile Include="ExtCalcLexer.fs" />
     <Compile Include="Tests3.fs" />

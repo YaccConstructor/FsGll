@@ -4,17 +4,34 @@ module FsGll.ExtCalcLexer
 open System
 open Microsoft.FSharp.Text.Lexing
 
+[<CustomEquality; NoComparison>]
 type Lexem = 
     | EOF
     | COMMA
     | INT of int
     | FLOAT of float
     | IDENTIFIER of string
-    | PLUS | EQ | LT | LE | GT | GE
+    | PLUS | MULT | DIV 
+    | EQ | LT | LE | GT | GE
+    | LPAREN | RPAREN
+    override this.Equals that = 
+        match that with
+        | :? Lexem as l -> 
+            match this with EOF ->   (match l with EOF -> true | _ -> false)
+                          | COMMA -> (match l with COMMA -> true | _ -> false)
+                          | PLUS ->  (match l with PLUS -> true | _ -> false)
+                          | MULT ->  (match l with MULT -> true | _ -> false)
+                          | DIV ->   (match l with DIV -> true | _ -> false)
+                          | EQ ->    (match l with EQ -> true | _ -> false)
+                          | LT ->    (match l with LT -> true | _ -> false)
+                          | _ -> false
+        | _ -> failwith "Lexem expected"
 
 let ops =
     [
         "+",    PLUS;
+        "*",    MULT;
+        "/",    DIV;
         "=",    EQ;
         "<",    LT;
         "<=",   LE;
@@ -30,7 +47,8 @@ let float       = '-'?digit+ '.' digit+
 let identifier  = char(char|digit|['_'])*
 let whitespace  = [' ' '\t']
 let newline     = "\n\r" | '\n' | '\r'
-let operator    = "+" | ">" | ">=" | "<" | "<=" | "="
+let operator    = "+" | "*" | "/" | ">" | ">=" | "<" | "<=" | "="
+let paren       = "(" | ")"
 
 rule tokenize = parse
 | whitespace    { tokenize lexbuf }   
@@ -39,5 +57,6 @@ rule tokenize = parse
 | int           { INT(Int32.Parse(LexBuffer<_>.LexemeString lexbuf)) }
 | identifier    { IDENTIFIER(LexBuffer<_>.LexemeString lexbuf) }
 | operator      { ops.[LexBuffer<_>.LexemeString lexbuf] }
+| paren         { if LexBuffer<_>.LexemeString lexbuf = "(" then LPAREN else RPAREN }
 | ','           { COMMA }
 | eof           { EOF }
