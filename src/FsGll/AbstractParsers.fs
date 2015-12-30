@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Collections
 open System.Collections.Generic
+open System.Text.RegularExpressions
 open FSharpx.Prelude
 open FsGll.InputStream
 
@@ -58,14 +59,10 @@ type GFailure<'a> (msg: string, tail: InputStream<'a>) =
 let success<'a, 'r when 'r: equality> value tail = new GSuccess<'a, 'r>(value, tail) :> GParserResult<_>
 let failure<'a> msg tail = new GFailure<'a>(msg, tail) :> GParserResult<'a>
 
-type ParserResult<'r> = 
-   | Success of value: 'r
-   | Failure of msg: string
-
 let parserResult<'a, 'r when 'r: equality> (r: GParserResult<'a>) = 
     match r with
     | :? GSuccess<'a, 'r> as succ -> Success (succ.Value)
-    | :? GFailure<'a> as fail -> Failure (fail.Message)
+    | :? GFailure<'a> as fail -> Failure (fail.Message, fail.Tail)
     | _ -> failwith "impossible"
 
 //type Failure (msg: string, tail: CharStream) = 
@@ -214,22 +211,22 @@ and Trampoline<'a>() as tram =
             match popped.TryGetValue(s) with
             | true, parsers-> 
                 if not <| parsers.ContainsKey(p) then
-                    popped.[s].Add(p, new SSet<'a>() )
+                    parsers.Add(p, new SSet<'a>() )
             | _, _ ->
-                popped.Add(s, new HOMap<GParser<'a>, SSet<'a> >() )
-                popped.[s].Add(p, new SSet<'a>() )
+                let nmap = new HOMap<GParser<'a>, SSet<'a> >() in nmap.Add(p, new SSet<'a>() )
+                popped.Add(s, nmap)
 
             if res.Succeeded then
                 popped.[s].[p].Add(res) |> ignore
-                savedToPopped <- savedToPopped + 1
+                //savedToPopped <- savedToPopped + 1
                 //trace(sprintf "Saved (to popped): %A *=> %A\n" (p, s) res)
 
             match saved.TryGetValue(res) with
             | true, set ->
                 backlinks.[s].[p] |> Seq.toArray |> Array.iter (fun f ->
-                    if (not <| set.Contains(f)) then
+                    if not (set.Contains(f)) then
                         set.Add f |> ignore
-                        savedToSaved <- savedToSaved + 1
+                        //savedToSaved <- savedToSaved + 1
                         f res
                     else 
                         foundInSaved <- foundInSaved + 1
@@ -237,9 +234,9 @@ and Trampoline<'a>() as tram =
             | _, _ -> 
                 let set = new HashSet<GParserResult<'a> -> unit>()
                 saved.Add (res, set)
-                backlinks.[s].[p] |> Seq.toArray |> Seq.iter (fun f ->
+                backlinks.[s].[p] |> Seq.toArray |> Array.iter (fun f ->
                     set.Add f |> ignore
-                    savedToSaved <- savedToSaved + 1
+                    //savedToSaved <- savedToSaved + 1
                     f res 
                 )
 
@@ -258,25 +255,29 @@ and Trampoline<'a>() as tram =
             
     member this.Add (p: GParser<'a>, s: InputStream<'a>) (f: GParserResult<'a> -> unit) : unit = 
         let tuple = (p, s)
-        
         match backlinks.TryGetValue(s) with
         | true, parsers-> 
             if not <| parsers.ContainsKey(p) then 
-                backlinks.[s].Add(p, new HashSet<(GParserResult<'a> -> unit)>() )
+                parsers.Add(p, new FSet<'a>() )
         | _, _ ->
-            backlinks.Add(s, new HOMap<GParser<'a>, FSet<'a> >() )
-            backlinks.[s].Add(p, new FSet<'a>() )
+            let nmap = new HOMap<GParser<'a>, FSet<'a> >() in nmap.Add(p, new FSet<'a>())
+            backlinks.Add(s, nmap)
 
         backlinks.[s].[p].Add(f) |> ignore
 
         match popped.TryGetValue(s) with
         | true, parsers when parsers.ContainsKey p ->
             //foundInPopped <- foundInPopped + 1
-            parsers.[p] |> Seq.iter(fun res ->            // if we've already done that, use the result
+            parsers.[p] |> Seq.toArray |> Seq.iter(fun res ->            // if we've already done that, use the result
                 //trace(sprintf "Revisited: %A *=> %A\n" tuple res)
                 f res
             )
         | _ ->
+//            if not (_done.ContainsKey s) then _done.Add(s, new HashSet<GParser<'a> >())
+//            if not (_done.[s].Contains p) then 
+//                _queue.Add(tuple)
+//                _done.[s].Add(p) |> ignore
+
             notFoundInPopped <- notFoundInPopped + 1
             let addTuple(parsers: HashSet<GParser<'a> >) = 
                 //notFoundInDone <- notFoundInDone + 1
@@ -298,7 +299,7 @@ and Trampoline<'a>() as tram =
 
 #nowarn "1189"
 
-let private withSucc<'a, 'r when 'r : equality> (sf: _ -> GParserResult<'a>) (f: Continuation<'a>) = 
+let inline private withSucc<'a, 'r when 'r : equality> (sf: _ -> GParserResult<'a>) (f: Continuation<'a>) = 
     (fun (r: GParserResult<'a>) ->
         match r with
         | :? GSuccess<'a, 'r> as s1 -> sf s1 |> f
@@ -386,10 +387,24 @@ let (.>>)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) 
 
 //let (>>.) this that = this >>= fun _ -> that
 let (>>.)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (q: Parser<'a, 'r2>) : Parser<'a, 'r2> = 
-    { new NonTerminalParser<'a, 'r2>() with 
-      override nt.Chain(t, s) (f) = 
-          t.Add(p, s) (fun r -> if r.Succeeded then q.Chain(t, r.Tail) f else f r)
-    } :> Parser<'a, 'r2>
+    let nonTermPar () = { new NonTerminalParser<'a, 'r2>() with 
+                          override nt.Chain(t, s) (f) = 
+                              t.Add(p, s) (fun r -> if r.Succeeded then q.Chain(t, r.Tail) f else f r)
+                        } :> Parser<'a, 'r2>
+    match p with 
+    | :? TerminalParser<'a,'r> as p -> 
+        match q with 
+        | :? TerminalParser<'a,'r2> as q ->
+            { new TerminalParser<'a, 'r2>() with
+              override x.Parse s = 
+                  match p.Parse(s) with
+                  | :? GSuccess<'a, 'r> as r -> q.Parse(r.Tail)
+                  | fail -> fail
+            } :> Parser<'a, 'r2>
+        | _ -> nonTermPar ()
+    | _ -> nonTermPar ()
+
+    
 
 let (.>>.) p1 p2 = 
     p1 >>= fun a ->
@@ -410,8 +425,7 @@ let (|>>)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) 
         } :> Parser<'a, 'r2>
     | _ -> 
         { new NonTerminalParser<'a, 'r2>() with 
-          override nt.Chain(t, s) (f) = 
-              t.Add(p, s) (withSucc (fun r -> success<'a, 'r2> (fn r.Value) r.Tail) f)
+          override nt.Chain(t, s) (f) = t.Add(p, s) (withSucc (fun r -> success<'a, 'r2> (fn r.Value) r.Tail) f)
         } :> Parser<'a, 'r2>
 
 let pipe2 p1 p2 fn = 
@@ -441,10 +455,33 @@ let notFollowedBy (p: TerminalParser<'a, 'r>) : Parser<'a, unit> =
                else failure "SyntaxError (notFollowedBy)" s
     } :> Parser<'a, unit>
     
+let pstr (pat: string) = 
+    { new TerminalParser<char, string>() with 
+      override this.Parse s = 
+          let s = s :?> StringInputStream 
+          if s.SMatch(pat) then success<char, string> pat (s.DropN pat.Length)
+          else failure "Unexpected" s
+    } :> Parser<char, string>
+
+let preg(pat: string) =
+    let regex = new Regex("^(" + pat + ")")
+    { new TerminalParser<char, string>() with 
+      override this.Parse s = 
+          let s = s :?> StringInputStream 
+          match s.RMatch(regex) with
+          | true, capt -> success<char, string> pat (s.DropN capt.Length)
+          | _, _ ->  failure "Unexpected" s
+    } :> Parser<char, string>
+
 let private dummyParser<'a, 'r when 'r : equality> = 
-   { new TerminalParser<'a, 'r>() with override this.Parse s = failwith "DummyParser" } :> Parser<'a, 'r>
+   { new TerminalParser<'a, 'r>() with override this.Parse s = failwith msgDummyUsed } :> Parser<'a, 'r>
 
 let createParserForwardedToRef<'a, 'r when 'r : equality>(name:string) = 
     let r = ref dummyParser<'a, 'r>
     { new NonTerminalParser<'a, 'r>() with 
       override this.Chain(t, inp) (f) = (!r).Chain(t, inp) (f) } :> Parser<'a, 'r>, r
+
+let runParser (p: Parser<'a, 'r>) (s: 'a seq) : ParserResult<'a, 'r> list = 
+    let res = p.Apply(new ArrayInputStream<'a>(Seq.toArray s, 0))
+    if res.IsEmpty then failwith msgLibraryError
+    res |> List.map parserResult<'a, 'r>
