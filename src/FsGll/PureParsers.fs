@@ -8,9 +8,6 @@ open FSharpx.Prelude
 open System.Threading
 open FsGll.InputStream
 
-let msgLibraryError = "Error in FsGll library."
-let msgDummyUsed = "Parser created with createParserForwardedToRef is not defined"
-
 //let trace s = printfn "%s" s
 let trace _ = ()
 //
@@ -81,31 +78,31 @@ type GFailure<'a> (msg: string, tail: InputStream<'a>) =
 let success<'a, 'r when 'r: equality> value tail = new GSuccess<'a, 'r>(value, tail) :> GParserResult<_>
 let failure<'a> msg tail = new GFailure<'a>(msg, tail) :> GParserResult<'a>
 
-type ParserResult<'r> = 
-   | Success of value: 'r
-   | Failure of msg: string
-
 let parserResult<'a, 'r when 'r: equality> (r: GParserResult<'a>) = 
     match r with
     | :? GSuccess<'a, 'r> as succ -> Success (succ.Value)
-    | :? GFailure<'a> as fail -> Failure (fail.Message)
+    | :? GFailure<'a> as fail -> Failure (fail.Message, fail.Tail)
     | _ -> failwith msgLibraryError
 
 
 let mutable private gParserAutoincrement = 0
 let mutable private disjunctiveParserChainInvokations = 0
 
-type Cont() = 
-    static member New<'a> fn = new Continuation<'a>(fn)
-    static member WithSucc<'a, 'r when 'r : equality> sf (f: Continuation<'a>) = 
-        Cont.New(fun (t, r) ->
-            match r with
-            | :? GSuccess<'a, 'r> as s1 -> (t, sf s1) |> f.F
-            | fail -> (t, fail) |> f.F)
+open FSharpx.State
 
-and Continuation<'a>(f: Trampoline<'a> * GParserResult<'a> -> Trampoline<'a>) = 
+let inline modify<'s> (f: 's -> 's) = getState >>= (putState << f)
+
+type PState<'a> = State<unit, Trampoline<'a> >
+
+and Cont() = 
+    static member New<'a> (fn: GParserResult<'a> -> PState<'a>) = new Continuation<'a>(fn)
+    static member WithSucc<'a, 'r when 'r : equality> (sf: GSuccess<'a, 'r> -> GParserResult<'a>) (f: Continuation<'a>) = 
+        Cont.New(function :? GSuccess<'a, 'r> as s1 -> sf s1 |> f.F
+                        | fail -> fail |> f.F)
+
+and Continuation<'a>(f: GParserResult<'a> -> PState<'a>) = 
     inherit Unique()
-    member this.F = f
+    member this.F : (GParserResult<'a> -> PState<'a>)  = f
     static member New fn = new Continuation<'a>(fn)
     override this.Equals that = 
         //Object.ReferenceEquals (f, (that :?> Continuation<'a>).F) |> ignore
@@ -122,7 +119,7 @@ and HOMap<'k,'v when 'k: comparison> = Map<'k,'v>
 
 and [<AbstractClass>] GParser<'a> () = 
     inherit Unique()
-    abstract member Chain : Trampoline<'a> * InputStream<'a> -> Continuation<'a> -> Trampoline<'a>
+    abstract member Chain : InputStream<'a> -> Continuation<'a> -> PState<'a>
 
 and [<AbstractClass>] Parser<'a, 'r when 'r : equality> () = 
     inherit GParser<'a> ()
@@ -131,21 +128,24 @@ and [<AbstractClass>] Parser<'a, 'r when 'r : equality> () =
 and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () = 
     inherit Parser<'a, 'r> ()
     override this.Apply (inp: InputStream<'a>) = 
-        let t = { 
-            Queue = []; Done = Map.empty; Popped = Map.empty; DisjResults = Map.empty
+        { 
+            Queue = []; Done = Map.empty; Popped = Map.empty; DisRes = Map.empty
             Backlinks = Map.empty; Saved = Map.empty; Stopped = false
             Successes = Set.empty; Failures = Set.empty; Postrace = []
         }
-
-        let t = this.Chain(t, inp) (Continuation<_>.New(fun (t, res) ->
-            if res.Succeeded && not res.Tail.IsEmpty 
-            then failure "UnexpectedTrailingChars" (res.Tail) else res
-            |> t.AddResult
-        ))
-
-        let t = t.Run()
-
-        (if t.Successes.Count = 0 then t.Failures else t.Successes) |> Seq.toList
+        |> 
+        state {
+            do! this.Chain(inp) (Continuation<_>.New(fun res ->
+                if res.Succeeded && not res.Tail.IsEmpty 
+                then failure "UnexpectedTrailingChars" (res.Tail) else res
+                |> T.AddResult
+            ))
+            do! T.Run ()
+            let! t = getState
+            return (if t.Successes.Count = 0 then t.Failures else t.Successes) |> Seq.toList
+        } 
+        |> fst
+        
 
 and [<AbstractClass>] TerminalParser<'a, 'r when 'r : equality> () = 
     inherit Parser<'a, 'r> ()
@@ -157,7 +157,7 @@ and [<AbstractClass>] TerminalParser<'a, 'r when 'r : equality> () =
             | :? GSuccess<'a, 'r> as succ1 -> [succ1]
             | x -> [x]
     
-    override this.Chain (t, inp) (f) = (t, this.Parse inp) |> f.F
+    override this.Chain (inp) (f) = this.Parse inp |> f.F
 
 and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Parser<'a, 'r>) as disj =
     inherit NonTerminalParser<'a, 'r>()
@@ -174,19 +174,21 @@ and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Pa
 
         recprocess(left) @ recprocess(right)
     
-    override this.Chain(t, inp) (f) = 
-        let lst = gather.Value
-        let invocation = (new Unique()).Uid
-        lst 
-        |> List.fold (fun t p -> 
-            t.Add(p, inp) (Cont.New(fun (t, res) ->
-                let results = Map.find invocation t.DisjResults
-                if results.Contains (res) then t
-                else { f.F (t, res) with 
-                        DisjResults = t.DisjResults.Add(invocation, results.Add(res)) }
-            ))
-        ) { t with DisjResults = t.DisjResults.Add(invocation, Set.empty) }
-    
+    override this.Chain(inp) (f) = state {
+        let invoc = (new Unique()).Uid
+        do! modify (fun t -> { t with DisRes = t.DisRes.Add(invoc, Set.empty) })
+        for p in gather.Value do 
+            return! T.Add(p, inp) (Cont.New(fun res -> state {
+                let! t = getState
+                let results = Map.find invoc t.DisRes
+                if results.Contains (res) then return ()
+                else return! state { 
+                    do! f.F res
+                    do! modify (fun t -> { t with DisRes = t.DisRes.Add(invoc, results.Add(res)) }) 
+                }
+            })) 
+        }
+
 and Trampoline<'a> = { 
     // R
     Queue: (GParser<'a> * InputStream<'a>) list
@@ -207,75 +209,89 @@ and Trampoline<'a> = {
     Successes: SSet<'a>
     Failures: SSet<'a>
     Postrace: string list
-    DisjResults: Map<int, SSet<'a> >
-} with
-    member t.AddResult(r: GParserResult<'a>) : Trampoline<'a> = 
-        if r.Succeeded 
-        then { t with Successes = t.Successes.Add(r) }
-        else { t with Failures = t.Failures.Add(r) }
+    DisRes: Map<int, SSet<'a> >
+} 
+and T () =
+     
+    static member AddResult<'a> (r: GParserResult<'a>) : PState<'a> = 
+        getState >>= fun t ->
+            putState <| if r.Succeeded then { t with Successes = t.Successes.Add(r) }
+                                       else { t with Failures = t.Failures.Add(r) }
 
-    member t.Run() : Trampoline<'a> = 
-        if List.isEmpty t.Queue || t.Stopped then t
-        else t.Step().Run()
+    static member Run<'a> () : PState<'a> = state { 
+        let! t = getState
+        if not (List.isEmpty t.Queue || t.Stopped) then
+            do! T.Step ()
+            return! T.Run ()
+    }
          
-    member t.Stop() : Trampoline<'a> = { t with Stopped = true }
+    static member Stop<'a> () : PState<'a> = modify (fun t -> { t with Stopped = true })
 
-    member t.Step() : Trampoline<'a> = 
-        let p, s = t.Queue.Head
-        let t = { t with Queue = List.tail t.Queue }
-        p.Chain (t, s) (Cont.New(fun (t, res) ->
+    static member Step<'a> () : PState<'a> = state { 
+        let! t1 = getState
+        let p, s = t1.Queue.Head
+        do! modify (fun t -> { t with Queue = List.tail t.Queue })
+        do! p.Chain (s) (Cont.New(fun res -> state {
+            let! t = getState
             let popped =
-                if not <| res.Succeeded then t.Popped
-                else
-                    //savedToPopped <- savedToPopped + 1 
-                    let parsers = match t.Popped.TryFind(s) with | Some ps -> ps | _ -> Map.empty
-                    let rset = match parsers.TryFind(p) with | Some rs -> rs | _ -> Set.empty
-                    t.Popped.Add(s, parsers.Add(p, rset.Add(res)))
+                let parsers = match t.Popped.TryFind(s) with | Some ps -> ps | _ -> Map.empty
+                let rset = match parsers.TryFind(p) with | Some rs -> rs 
+                                                         | _ -> (if res.Succeeded then Set.singleton res else Set.empty)
+                t.Popped.Add(s, parsers.Add(p, rset))
 
-            let t = { t with Popped = popped }
+            do! modify (fun t -> { t with Popped = popped })
+            let! t = getState
+            let links = t.Backlinks.[s].[p] |> Seq.toList
+            // TODO OK  ???
             match t.Saved.TryFind(res) with
             | Some _ ->
-                let links = t.Backlinks.[s].[p]
-                links |> Seq.fold (fun t f ->
-                    let set = t.Saved.[res]              // CAN BE A BUG
-                    if (set.Contains(f)) then t
-                    else ({ t with Saved = t.Saved.Add(res, set.Add f) }, res) |> f.F
-                ) t
+                for f in links do
+                    let! t = getState
+                    let set = t.Saved.[res]              // TODO CAN BE A BUG
+                    if not (set.Contains(f)) then
+                        do! modify (fun t -> { t with Saved = t.Saved.Add(res, set.Add f) })
+                        do! res |> f.F
             | _ -> 
-                let set = Set.empty
-                let t = { t with Saved = t.Saved.Add (res, set) }
-                t.Backlinks.[s].[p] |> Seq.fold (fun t f ->
-                    ({ t with Saved = t.Saved.Add(res, set.Add f) }, res) |> f.F
-                ) t
+                do! modify (fun t -> { t with Saved = t.Saved.Add (res, Set.empty) } )
+                for f in links do
+                    let! t = getState
+                    let set = t.Saved.[res]
+                    do! modify (fun t -> { t with Saved = t.Saved.Add(res, set.Add f) }) 
+                    do! res |> f.F
+            }
         ))
+        }
 
-    member t.Add (p: GParser<'a>, s: InputStream<'a>) (f: Continuation<'a>) : Trampoline<'a> = 
+    static member Add<'a> (p: GParser<'a>, s: InputStream<'a>) (f: Continuation<'a>) : PState<'a> = state {
         let tuple = (p, s)
-
+        let! t = getState
         let backlinks = 
             let parsers = match t.Backlinks.TryFind(s) with | Some ps -> ps | _ -> Map.empty
-            let fset = match parsers.TryFind(p) with | Some fs -> fs | _ -> Set.empty
-            t.Backlinks.Add(s, parsers.Add(p, fset.Add(f)))
-        let t = { t with Backlinks = backlinks }
+            let fset = match parsers.TryFind(p) with | Some fs -> fs | _ -> Set.singleton f
+            t.Backlinks.Add(s, parsers.Add(p, fset))
+        do! modify <| fun t -> { t with Backlinks = backlinks }
+        let! t = getState
         match t.Popped.TryFind(s) with
         | Some parsers when parsers.ContainsKey p ->
-            parsers.[p] |> Seq.fold (fun t res -> f.F (t, res)) t // if we've already done that, use the result
+            for res in parsers.[p] do
+                do! f.F (res) // if we've already done that, use the result
         | _ ->
             let parsers = match t.Done.TryFind(s) with | Some ps -> ps | _ -> Set.empty
-            if parsers.Contains p then t
-            else { t with Queue = tuple :: t.Queue; Done = t.Done.Add(s, parsers.Add p) }
+            if not (parsers.Contains p) then 
+                do! modify (fun t -> { t with Queue = tuple :: t.Queue; Done = t.Done.Add(s, parsers.Add p) })
+        }
 
 #nowarn "1189"
 
-let preturn<'a, 'r when 'r: equality> (a: 'r) : Parser<'a, 'r> = 
+let inline preturn<'a, 'r when 'r: equality> (a: 'r) : Parser<'a, 'r> = 
     { new TerminalParser<'a, 'r>() 
       with override this.Parse inp = success<'a, 'r> a inp } :> Parser<'a, 'r>
 
-let perror<'a, 'r when 'r: equality> (msg: string) : Parser<'a, 'r> = 
+let inline perror<'a, 'r when 'r: equality> (msg: string) : Parser<'a, 'r> = 
     { new TerminalParser<'a, 'r>() 
       with override this.Parse inp = failure<'a> msg inp } :> Parser<'a, 'r>
 
-let satisfy<'a when 'a: equality> (pred : 'a -> bool) = 
+let inline satisfy<'a when 'a: equality> (pred : 'a -> bool) = 
     { new TerminalParser<'a, 'a>() with 
       override this.Parse (s: InputStream<'a>) =
         if s.IsEmpty then failure<'a> "UnexpectedEOF" s
@@ -286,37 +302,37 @@ let satisfy<'a when 'a: equality> (pred : 'a -> bool) =
 
 let (>>=)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (fn: 'r -> Parser<'a, 'r2>) : Parser<'a, 'r2> = 
     { new NonTerminalParser<'a, 'r2>() with 
-      override nt.Chain(t, inp) (cont) = 
-            t.Add(p, inp) (Cont.New (fun (t, res) -> 
+      override nt.Chain(inp: InputStream<'a>) (cont) =
+            T.Add(p, inp) <| Cont.New (fun res ->
                 match res with 
-                | :? GSuccess<'a, 'r> as succ1 -> fn(succ1.Value).Chain(t, succ1.Tail) (cont)
-                | fail -> (t, fail) |> cont.F))
+                | :? GSuccess<'a, 'r> as s1 -> fn(s1.Value).Chain(s1.Tail) (cont)
+                | fail -> fail |> cont.F )  
     } :> Parser<'a, 'r2>
 
-let many1<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
+let many1<'a, 'r when 'r : equality> (p: Parser<'a, 'r>) = 
     { new NonTerminalParser<'a, 'r list>() with 
-        override nt.Chain(t, inp) (f) = 
-            t.Add(this, inp) (Cont.New (fun (t, r) -> 
+        override q.Chain s f = 
+            T.Add(p, s) (Cont.New (fun r -> state {
                 match r with
                 | :? GSuccess<'a, 'r> as s1 -> 
-                    let t = (t, success<'a, 'r list> [s1.Value] s1.Tail) |> f.F
-                    t.Add(nt, s1.Tail) (Cont.WithSucc (fun s2 -> success<'a, 'r list> (s1.Value :: s2.Value) s2.Tail) f)
-                | fail -> (t, fail) |> f.F
-            ))
+                    do! success<'a, 'r list> [s1.Value] s1.Tail |> f.F
+                    do! T.Add(q, s1.Tail) (Cont.WithSucc (fun s2 -> success<'a, 'r list> (s1.Value :: s2.Value) s2.Tail) f)
+                | fail -> do! fail |> f.F } ) ) 
+            
     } :> Parser<'a, 'r list>
 
-let many<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
+let many<'a, 'r when 'r : equality> (p: Parser<'a, 'r>) = 
     { new NonTerminalParser<'a, 'r list>() with 
-        override nt.Chain (t, s) f =
-            let t = (t, success<'a, 'r list> [] s) |> f.F
-            t.Add(many1 this, s) f
+        override nt.Chain s f = state {
+            do! success<'a, 'r list> [] s |> f.F
+            do! T.Add(many1 p, s) f }
     } :> Parser<'a, 'r list>
 
-let opt<'a, 'r when 'r : equality> (this: Parser<'a, 'r>) = 
+let opt<'a, 'r when 'r : equality> (p: Parser<'a, 'r>) = 
     { new NonTerminalParser<'a, 'r option>() with 
-        override nt.Chain(t, s) (f) = 
-            let t = (t, success<'a, 'r option> None s) |> f.F
-            t.Add(this, s) (Cont.WithSucc (fun r -> success (Some r.Value) r.Tail) f)
+        override nt.Chain(s) (f) : PState<'a> = state {
+            do! (success<'a, 'r option> None s) |> f.F
+            do! T.Add(p, s) (Cont.WithSucc (fun r -> success (Some r.Value) r.Tail) f) }
     } :> Parser<'a, 'r option>
 
 let epsilon<'a> = preturn ()
@@ -334,19 +350,21 @@ let (>>%) this x = this >>= fun _ -> preturn x
 //    p >>= fun (x: 'r1) -> q >>% x
 let (.>>)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (q: Parser<'a, 'r2>) : Parser<'a, 'r> = 
     { new NonTerminalParser<'a, 'r>() with 
-      override nt.Chain(t, inp) (f) = 
-            t.Add(p, inp) (Cont.New(fun (t, r) ->
-                 match r with 
+      override nt.Chain s f = 
+            T.Add(p, s) <| Cont.New(function
                  | :? GSuccess<'a, 'r> as s1 -> 
-                     q.Chain(t, s1.Tail) (Cont.WithSucc (fun s -> success<'a, 'r> s1.Value s.Tail) f)
-                 | fail -> (t, fail) |> f.F))
+                    //q.Chain(s1.Tail) <| Cont.WithSucc<'a, 'r2> (fun s2 -> success<'a, 'r> s1.Value s2.Tail) f
+                    q.Chain(s1.Tail) <| Cont.New(function 
+                                        | :? GSuccess<'a, 'r2> as s2 -> success<'a, 'r> s1.Value s2.Tail |> f.F
+                                        | fail -> fail |> f.F)
+                 | fail -> fail |> f.F )
     } :> Parser<'a, 'r>
 
 //let (>>.) this that = this >>= fun _ -> that
 let (>>.)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (q: Parser<'a, 'r2>) : Parser<'a, 'r2> = 
     { new NonTerminalParser<'a, 'r2>() with 
-      override nt.Chain (t, s) f = 
-          t.Add(p, s) (Cont.New(fun (t, r) -> if r.Succeeded then q.Chain(t, r.Tail) (f) else (t, r) |> f.F))
+      override nt.Chain s f = 
+          T.Add(p, s) <| Cont.New(fun r -> if r.Succeeded then q.Chain(r.Tail) f else r |> f.F)
     } :> Parser<'a, 'r2>
 
 let (.>>.) p1 p2 = 
@@ -368,8 +386,7 @@ let (|>>)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) 
         } :> Parser<'a, 'r2>
     | _ -> 
         { new NonTerminalParser<'a, 'r2>() with 
-          override nt.Chain (t, s) f = 
-              t.Add(p, s) (Cont.WithSucc (fun r -> success<'a, 'r2> (fn r.Value) r.Tail) f)
+          override nt.Chain s f = T.Add(p, s) (Cont.WithSucc (fun r -> success<'a, 'r2> (fn r.Value) r.Tail) f)
         } :> Parser<'a, 'r2>
 
 let pipe2 p1 p2 fn = 
@@ -392,9 +409,9 @@ let sepBy (p: Parser<'a, 'r>) sep : Parser<'a, 'r list> =
 
 let notFollowedBy (p: TerminalParser<'a, 'r>) : Parser<'a, unit> = 
     { new NonTerminalParser<'a, unit> () with
-      override this.Chain(t, inp) (f) =
-          f.F <| if (p.Parse inp).Failed then (t, success<'a, unit> () inp) 
-                 else (t, failure "SyntaxError (notFollowedBy)" inp) 
+      override nt.Chain s f =
+          f.F <| if (p.Parse s).Failed then success<'a, unit> () s
+                 else failure "SyntaxError (notFollowedBy)" s 
     } :> Parser<'a, unit>
     
 let private dummyParser<'a, 'r when 'r : equality> = 
@@ -403,9 +420,9 @@ let private dummyParser<'a, 'r when 'r : equality> =
 let createParserForwardedToRef<'a, 'r when 'r : equality>(name:string) = 
     let r = ref dummyParser<'a, 'r>
     { new NonTerminalParser<'a, 'r>() with 
-      override this.Chain(t, inp) (f) = (!r).Chain(t, inp) (f) } :> Parser<'a, 'r>, r
+      override this.Chain s f = (!r).Chain s f } :> Parser<'a, 'r>, r
 
-let runParser (p: Parser<'a, 'r>) (s: 'a seq) : ParserResult<'r> list = 
+let runParser (p: Parser<'a, 'r>) (s: 'a seq) : ParserResult<'a, 'r> list = 
     let res = p.Apply(new ArrayInputStream<'a>(Seq.toArray s, 0))
     if res.IsEmpty then failwith msgLibraryError
     res |> List.map parserResult<'a, 'r>
