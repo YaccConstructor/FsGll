@@ -232,8 +232,6 @@ let measurePerformance test (n: string option) (log: string option) =
         doDebug()
     | _ -> Some "Unknown testcase"
 
-       
-
 //    let sw = new Stopwatch()
 //    sw.Start()
 //    let a = badGrammar(90)
