@@ -8,8 +8,9 @@ open FSharpx.Prelude
 open System.Threading
 open FsGll.InputStream
 
-//let trace s = printfn "%s" s
+//let trace (s: Lazy<string>) = printfn "%s" s.Value
 let trace _ = ()
+
 //
 //let mutable foundInDone = 0
 //let mutable notFoundInDone = 0
@@ -233,15 +234,17 @@ and T () =
         let! t1 = getState
         let p, s = t1.Queue.Head
         do! modify (fun t -> { t with Queue = List.tail t.Queue })
+        trace <| lazy (sprintf "Removed: %A" (p, s))
         do! p.Chain (s) (Cont.New(fun res -> state {
             let! t = getState
             let popped =
                 let parsers = match t.Popped.TryFind(s) with | Some ps -> ps | _ -> Map.empty
-                let rset = match parsers.TryFind(p) with | Some rs -> rs 
+                let rset = match parsers.TryFind(p) with | Some rs -> Set.add res rs 
                                                          | _ -> (if res.Succeeded then Set.singleton res else Set.empty)
                 t.Popped.Add(s, parsers.Add(p, rset))
 
             do! modify (fun t -> { t with Popped = popped })
+            if res.Succeeded then trace(lazy (sprintf "Saved (to popped): %A *=> %A\n" (p, s) res))
             let! t = getState
             let links = t.Backlinks.[s].[p] |> Seq.toList
             // TODO OK  ???
@@ -250,7 +253,7 @@ and T () =
                 for f in links do
                     let! t = getState
                     let set = t.Saved.[res]              // TODO CAN BE A BUG
-                    if not (set.Contains(f)) then
+                    if not (set.Contains f) then
                         do! modify (fun t -> { t with Saved = t.Saved.Add(res, set.Add f) })
                         do! res |> f.F
             | _ -> 
@@ -269,18 +272,20 @@ and T () =
         let! t = getState
         let backlinks = 
             let parsers = match t.Backlinks.TryFind(s) with | Some ps -> ps | _ -> Map.empty
-            let fset = match parsers.TryFind(p) with | Some fs -> fs | _ -> Set.singleton f
+            let fset = match parsers.TryFind(p) with | Some fs -> Set.add f fs | _ -> Set.singleton f
             t.Backlinks.Add(s, parsers.Add(p, fset))
         do! modify <| fun t -> { t with Backlinks = backlinks }
         let! t = getState
         match t.Popped.TryFind(s) with
         | Some parsers when parsers.ContainsKey p ->
             for res in parsers.[p] do
+                trace(lazy(sprintf "Revisited: %A *=> %A\n" tuple res))
                 do! f.F (res) // if we've already done that, use the result
         | _ ->
             let parsers = match t.Done.TryFind(s) with | Some ps -> ps | _ -> Set.empty
             if not (parsers.Contains p) then 
                 do! modify (fun t -> { t with Queue = tuple :: t.Queue; Done = t.Done.Add(s, parsers.Add p) })
+                trace(lazy(sprintf "Added: %A\n" tuple))
         }
 
 #nowarn "1189"
