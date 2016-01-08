@@ -25,10 +25,11 @@ let trace _ = ()
 //
 //let mutable trampolinesCreated = 0
 
-// dirty hack to overcome Set problem
+// dirty hack to overcome Set and Map problem
+type TUid = int
 type Unique() =
-    static let mutable (au : int) = 0
-    let uid : int = Interlocked.Increment(&au)
+    static let mutable (au : TUid) = 0
+    let uid : TUid = Interlocked.Increment(&au)
     member this.Uid = uid
 
     // Some dirty code to store Unique in Set
@@ -39,8 +40,10 @@ type Unique() =
                 match that with 
                 | :? Unique as that -> 
                     let h1, h2 = this.GetHashCode(), that.GetHashCode()
-                    if h1 <> h2 then h1 - h2 else uid - that.Uid 
-                | _ -> invalidArg "that" "Can not compare"
+                    if h1 <> h2 
+                    then h1 - h2 
+                    else (if uid = that.Uid then 0 else failwith msgLibraryError) // TODO uid - that.Uid 
+                | _ -> invalidArg "that" msgLibraryError
     override this.Equals _ = false 
     override this.GetHashCode() = uid.GetHashCode()
 
@@ -97,8 +100,9 @@ type PState<'a> = State<unit, Trampoline<'a> >
 and Cont() = 
     static member New<'a> (fn: GParserResult<'a> -> PState<'a>) = new Continuation<'a>(fn)
     static member WithSucc<'a, 'r when 'r : equality> (sf: GSuccess<'a, 'r> -> GParserResult<'a>) (f: Continuation<'a>) = 
-        Cont.New(function :? GSuccess<'a, 'r> as s1 -> sf s1 |> f.F
-                        | fail -> fail |> f.F)
+        Cont.New(function :? GSuccess<'a, 'r> as s1 -> sf s1 |> f.F           
+                        | :? GFailure<'a> as fail -> fail :> GParserResult<'a> |> f.F
+                        | _ -> failwith msgLibraryError)
 
 and Continuation<'a>(f: GParserResult<'a> -> PState<'a>) = 
     inherit Unique()
@@ -181,11 +185,9 @@ and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Pa
             return! T.Add(p, inp) (Cont.New(fun res -> state {
                 let! t = getState
                 let results = Map.find invoc t.DisRes
-                if results.Contains (res) then return ()
-                else return! state { 
+                if not (results.Contains res) then 
                     do! f.F res
-                    do! modify (fun t -> { t with DisRes = t.DisRes.Add(invoc, results.Add(res)) }) 
-                }
+                    do! modify (fun t -> { t with DisRes = t.DisRes.Add(invoc, t.DisRes.[invoc].Add res) }) 
             })) 
         }
 
@@ -209,7 +211,7 @@ and Trampoline<'a> = {
     Successes: SSet<'a>
     Failures: SSet<'a>
     Postrace: string list
-    DisRes: Map<int, SSet<'a> >
+    DisRes: Map<TUid, SSet<'a> >
 } 
 and T () =
      
@@ -283,6 +285,11 @@ and T () =
 
 #nowarn "1189"
 
+let inline private ntp<'a, 'rret when 'rret : equality> chain = 
+    { new NonTerminalParser<'a, 'rret>() with 
+      override nt.Chain s f = chain s f
+    } :> Parser<'a, 'rret>
+
 let inline preturn<'a, 'r when 'r: equality> (a: 'r) : Parser<'a, 'r> = 
     { new TerminalParser<'a, 'r>() 
       with override this.Parse inp = success<'a, 'r> a inp } :> Parser<'a, 'r>
@@ -299,6 +306,11 @@ let inline satisfy<'a when 'a: equality> (pred : 'a -> bool) =
             let h = s.Head
             if h |> pred then success<'a, 'a> h (s.Drop)
             else failure<'a> "Unexpected token" s }
+
+let (>>==) (p: Parser<'a, 'r>) (fn: 'r -> Parser<'a, 'r2>) : Parser<'a, 'r2> = 
+    ntp <| fun s f -> T.Add(p, s) <| Cont.New (function
+                | :? GSuccess<'a, 'r> as s1 -> fn(s1.Value).Chain(s1.Tail) (f)
+                | fail -> fail |> f.F)
 
 let (>>=)<'a, 'r, 'r2 when 'r: equality and 'r2 : equality> (p: Parser<'a, 'r>) (fn: 'r -> Parser<'a, 'r2>) : Parser<'a, 'r2> = 
     { new NonTerminalParser<'a, 'r2>() with 

@@ -11,8 +11,8 @@ open FSharpx.Prelude
 
 
 open FsGll.ExtCalcLexer
-open FsGll.PureParsers
-//open FsGll.AbstractParsers
+//open FsGll.PureParsers
+open FsGll.AbstractParsers
 
 type E = 
     | EM of E * char * E
@@ -29,85 +29,203 @@ let tokenizer s =
     |> Seq.cache
     |> Seq.takeWhile (function | EOF -> false | _ -> true)
     |> Seq.toList
+module FPrsc = 
+    open FParsec
+    let extCalcLexerAndParser () = 
+        let factor, factorRef = createParserForwardedToRef()
+        let term, termRef     = createParserForwardedToRef()
+        let expr, exprRef     = createParserForwardedToRef()
 
-let extCalcParser () = 
-    let factor, factorRef = createParserForwardedToRef<Lexem, E>("factor")
-    let term, termRef     = createParserForwardedToRef<Lexem, E>("term")
-    let expr, exprRef     = createParserForwardedToRef<Lexem, E>("expr")
+        let chr c = satisfy ((=)c)
+        let whitespace = satisfy <| fun c -> c = ' ' || c = '\n' || c = '\r' || c = '\t'
+        let bws p = many whitespace >>. p .>> many whitespace
+
+        let digits   = many1 (satisfy <| fun c -> Char.IsDigit(c)) |>> (fun s -> s |> Seq.map string |> String.concat "")
+        let notDigit = satisfy (fun c -> Regex.IsMatch(string c, @"[a-zA-Z_]")) |>> string
+        let sym = satisfy (fun c -> Regex.IsMatch(string c, @"[0-9a-zA-Z_]")) |>> string
+
+        let assign     = bws (chr '=')
+        let semicolon  = bws (chr ';')
+        let lparen, rparen = bws (chr '('), bws (chr ')')
+        let value      = pipe2 digits (opt (chr '.' >>. digits)) <| fun a b -> EVal <| Double.Parse(a + defaultArg b "") 
+        let variable   = bws <| pipe2 notDigit (many sym) (fun a b -> EVar <| a + (b |> String.concat "") ) 
+        let minus      = bws (chr '-')
+        let multOp     = bws (chr '*') <|> bws (chr '/')
+        let additiveOp = bws (chr '+') <|> minus
+
+        factorRef     := value <|> variable <|> (pipe2 minus factor (fun _ f -> EUnary(MINUS, f))) <|> (lparen >>. expr .>> rparen)
+        termRef       := pipe3 factor multOp term (fun a x b -> EM (a, x, b)) <|> factor
+        exprRef       := pipe3 term additiveOp expr (fun a x b -> EP (a, x, b)) <|> term
+        let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
+        let pgm = pipe2 (many stmt) expr (curry EPgm)
+        pgm
+
+module A = 
+    let extCalcParser () = 
+        let factor, factorRef = createParserForwardedToRef<Lexem, E>("factor")
+        let term, termRef     = createParserForwardedToRef<Lexem, E>("term")
+        let expr, exprRef     = createParserForwardedToRef<Lexem, E>("expr")
     
-    let tok t = satisfy ((=)t)
+        let tok t = satisfy ((=)t)
 
-    let assign         = tok EQ
-    let semicolon      = tok SEMICOLON
-    let lparen, rparen = tok LPAREN, tok RPAREN
-    let value          = satisfy (function FLOAT _ | INT _ -> true | _ -> false) |>> (function FLOAT x -> EVal x | INT x -> EVal <| float x | _ -> failwith "er")
-    let variable       = satisfy (function IDENTIFIER _ -> true | _ -> false) |>> (function IDENTIFIER x -> EVar x | _ -> failwith "er")    
-    let minus          = tok MINUS
-    let multOp         = tok MULT <|> tok DIV
-    let additiveOp     = tok PLUS <|> minus
+        let assign         = tok EQ
+        let semicolon      = tok SEMICOLON
+        let lparen, rparen = tok LPAREN, tok RPAREN
+        let value          = satisfy (function FLOAT _ | INT _ -> true | _ -> false) |>> (function FLOAT x -> EVal x | INT x -> EVal <| float x | _ -> failwith "er")
+        let variable       = satisfy (function IDENTIFIER _ -> true | _ -> false) |>> (function IDENTIFIER x -> EVar x | _ -> failwith "er")    
+        let minus          = tok MINUS
+        let multOp         = tok MULT <|> tok DIV
+        let additiveOp     = tok PLUS <|> minus
     
-    factorRef     := value <|> variable <|> (pipe2 minus factor (curry EUnary)) <|> (lparen >>. expr .>> rparen)
-    termRef       := pipe3 factor multOp term (fun a x b -> match x with MULT -> EM (a, '*', b) | _ -> failwith "er") <|> factor
-    exprRef       := pipe3 term additiveOp expr (fun a x b -> match x with PLUS -> EP (a, '+', b) | _ -> failwith "er") <|> term
-    let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
-    let pgm = pipe2 (many stmt) expr (curry EPgm)
-    stmt
+        factorRef     := value <|> variable <|> (pipe2 minus factor (curry EUnary)) <|> (lparen >>. expr .>> rparen)
+        termRef       := pipe3 factor multOp term (fun a x b -> match x with MULT -> EM (a, '*', b) | DIV -> EM (a, '/', b) | _ -> failwith "er") <|> factor
+        exprRef       := pipe3 term additiveOp expr (fun a x b -> match x with PLUS -> EP (a, '+', b) | MINUS -> EP (a, '-', b) | _ -> failwith "er") <|> term
+        let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
+        let pgm = pipe2 (many stmt) expr (curry EPgm)
+        //pipe3 (value <|> variable) multOp (value <|> variable) (fun a x b -> (a,x,b))
+        pgm
 
 
-let extCalcLexerAndParser () = 
-    let factor, factorRef = createParserForwardedToRef<char, E>("factor")
-    let term, termRef     = createParserForwardedToRef<char, E>("term")
-    let expr, exprRef     = createParserForwardedToRef<char, E>("expr")
+    let extCalcLexerAndParser () = 
+        let factor, factorRef = createParserForwardedToRef<char, E>("factor")
+        let term, termRef     = createParserForwardedToRef<char, E>("term")
+        let expr, exprRef     = createParserForwardedToRef<char, E>("expr")
 
-    let chr c = satisfy ((=)c)
-    let whitespace = satisfy <| fun c -> c = ' ' || c = '\n' || c = '\r' || c = '\t'
-    let bws p = many whitespace >>. p .>> many whitespace
+        let chr c = satisfy ((=)c)
+        let whitespace = satisfy <| fun c -> c = ' ' || c = '\n' || c = '\r' || c = '\t'
+        let bws p = many whitespace >>. p .>> many whitespace
 
-    let digits   = many1 (satisfy <| fun c -> Char.IsDigit(c)) |>> (fun s -> s |> Seq.map string |> String.concat "")
-    let notDigit = satisfy (fun c -> Regex.IsMatch(string c, @"[a-zA-Z_]")) |>> string
-    let sym = satisfy (fun c -> Regex.IsMatch(string c, @"[0-9a-zA-Z_]")) |>> string
+        let digits   = many1 (satisfy <| fun c -> Char.IsDigit(c)) |>> (fun s -> s |> Seq.map string |> String.concat "")
+        let notDigit = satisfy (fun c -> Regex.IsMatch(string c, @"[a-zA-Z_]")) |>> string
+        let sym = satisfy (fun c -> Regex.IsMatch(string c, @"[0-9a-zA-Z_]")) |>> string
 
-    let assign     = bws (chr '=')
-    let semicolon  = bws (chr ';')
-    let lparen, rparen = bws (chr '('), bws (chr ')')
-    let value      = pipe2 digits (opt (chr '.' >>. digits)) <| fun a b -> EVal <| Double.Parse(a + defaultArg b "") 
-    let variable   = bws <| pipe2 notDigit (many sym) (fun a b -> EVar <| a + (b |> String.concat "") ) 
-    let minus      = bws (chr '-')
-    let multOp     = bws (chr '*') <|> bws (chr '/')
-    let additiveOp = bws (chr '+') <|> minus
+        let assign     = bws (chr '=')
+        let semicolon  = bws (chr ';')
+        let lparen, rparen = bws (chr '('), bws (chr ')')
+        let value      = pipe2 digits (opt (chr '.' >>. digits)) <| fun a b -> EVal <| Double.Parse(a + defaultArg b "") 
+        let variable   = bws <| pipe2 notDigit (many sym) (fun a b -> EVar <| a + (b |> String.concat "") ) 
+        let minus      = bws (chr '-')
+        let multOp     = bws (chr '*') <|> bws (chr '/')
+        let additiveOp = bws (chr '+') <|> minus
 
-    factorRef     := value <|> variable <|> (pipe2 minus factor (fun _ f -> EUnary(MINUS, f))) <|> (lparen >>. expr .>> rparen)
-    termRef       := pipe3 factor multOp term (fun a x b -> EM (a, x, b)) <|> factor
-    exprRef       := pipe3 term additiveOp expr (fun a x b -> EP (a, x, b)) <|> term
-    let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
-    let pgm = pipe2 (many stmt) expr (curry EPgm)
-    pgm
+        factorRef     := value <|> variable <|> (pipe2 minus factor (fun _ f -> EUnary(MINUS, f))) <|> (lparen >>. expr .>> rparen)
+        termRef       := pipe3 factor multOp term (fun a x b -> EM (a, x, b)) <|> factor
+        exprRef       := pipe3 term additiveOp expr (fun a x b -> EP (a, x, b)) <|> term
+        let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
+        let pgm = pipe2 (many stmt) expr (curry EPgm)
+        pgm
 
-let nnnParser () = 
-    let tok c = satisfy ((=)c)
-    let digit = tok '0' |>> string
-    let expr, exprRef = createParserForwardedToRef<_, string>("expr")
-    exprRef :=  (pipe2 expr expr (+)) <|> (digit)
-    expr
+    let nnnParser () = 
+        let tok c = satisfy ((=)c)
+        let digit = tok '0' |>> string
+        let expr, exprRef = createParserForwardedToRef<_, string>("expr")
+        exprRef :=  (pipe2 expr expr (+)) <|> (digit)
+        expr
 
-let runNnn (n) = 
-    let nnn = nnnParser ()
-    let inp = String.replicate n "0"
-    inp |> runParser nnn
+    let runNnn (n) = 
+        let nnn = nnnParser ()
+        let inp = String.replicate n "0"
+        inp |> runParser nnn
 
 
-let runExtCalcFslex (inp) = 
-    let eclp = extCalcParser ()
-    let tokens = tokenizer inp
-    tokens |> runParser eclp
+    let runExtCalcFslex (inp) = 
+        let eclp = extCalcParser ()
+        let tokens = tokenizer inp
+        tokens |> runParser eclp
 
-let runExtCalc (inp) = 
-    let ecp = extCalcLexerAndParser ()
-    inp |> runParser ecp
+    let runExtCalc (inp) = 
+        let ecp = extCalcLexerAndParser ()
+        inp |> runParser ecp
+
+module Pure = 
+    let extCalcParser () = 
+        let factor, factorRef = createParserForwardedToRef<Lexem, E>("factor")
+        let term, termRef     = createParserForwardedToRef<Lexem, E>("term")
+        let expr, exprRef     = createParserForwardedToRef<Lexem, E>("expr")
+    
+        let tok t = satisfy ((=)t)
+
+        let assign         = tok EQ
+        let semicolon      = tok SEMICOLON
+        let lparen, rparen = tok LPAREN, tok RPAREN
+        let value          = satisfy (function FLOAT _ | INT _ -> true | _ -> false) |>> (function FLOAT x -> EVal x | INT x -> EVal <| float x | _ -> failwith "er")
+        let variable       = satisfy (function IDENTIFIER _ -> true | _ -> false) |>> (function IDENTIFIER x -> EVar x | _ -> failwith "er")    
+        let minus          = tok MINUS
+        let multOp         = tok MULT <|> tok DIV
+        let additiveOp     = tok PLUS <|> minus
+    
+        factorRef     := value <|> variable <|> (pipe2 minus factor (curry EUnary)) <|> (lparen >>. expr .>> rparen)
+        termRef       := pipe3 factor multOp term (fun a x b -> match x with MULT -> EM (a, '*', b) | _ -> failwith "er") <|> factor
+        exprRef       := pipe3 term additiveOp expr (fun a x b -> match x with PLUS -> EP (a, '+', b) | _ -> failwith "er") <|> term
+        let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
+        let pgm = pipe2 (many stmt) expr (curry EPgm)
+        //pipe3 (value <|> variable) multOp (value <|> variable) (fun a x b -> (a,x,b))
+        term
+
+
+    let extCalcLexerAndParser () = 
+        let factor, factorRef = createParserForwardedToRef<char, E>("factor")
+        let term, termRef     = createParserForwardedToRef<char, E>("term")
+        let expr, exprRef     = createParserForwardedToRef<char, E>("expr")
+
+        let chr c = satisfy ((=)c)
+        let whitespace = satisfy <| fun c -> c = ' ' || c = '\n' || c = '\r' || c = '\t'
+        let bws p = many whitespace >>. p .>> many whitespace
+
+        let digits   = many1 (satisfy <| fun c -> Char.IsDigit(c)) |>> (fun s -> s |> Seq.map string |> String.concat "")
+        let notDigit = satisfy (fun c -> Regex.IsMatch(string c, @"[a-zA-Z_]")) |>> string
+        let sym = satisfy (fun c -> Regex.IsMatch(string c, @"[0-9a-zA-Z_]")) |>> string
+
+        let assign     = bws (chr '=')
+        let semicolon  = bws (chr ';')
+        let lparen, rparen = bws (chr '('), bws (chr ')')
+        let value      = pipe2 digits (opt (chr '.' >>. digits)) <| fun a b -> EVal <| Double.Parse(a + defaultArg b "") 
+        let variable   = bws <| pipe2 notDigit (many sym) (fun a b -> EVar <| a + (b |> String.concat "") ) 
+        let minus      = bws (chr '-')
+        let multOp     = bws (chr '*') <|> bws (chr '/')
+        let additiveOp = bws (chr '+') <|> minus
+
+        factorRef     := value <|> variable <|> (pipe2 minus factor (fun _ f -> EUnary(MINUS, f))) <|> (lparen >>. expr .>> rparen)
+        termRef       := pipe3 factor multOp term (fun a x b -> EM (a, x, b)) <|> factor
+        exprRef       := pipe3 term additiveOp expr (fun a x b -> EP (a, x, b)) <|> term
+        let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
+        let pgm = pipe2 (many stmt) expr (curry EPgm)
+        pgm
+
+    let nnnParser () = 
+        let tok c = satisfy ((=)c)
+        let digit = tok '0' |>> string
+        let expr, exprRef = createParserForwardedToRef<_, string>("expr")
+        exprRef :=  (pipe2 expr expr (+)) <|> (digit)
+        expr
+
+    let runNnn (n) = 
+        let nnn = nnnParser ()
+        let inp = String.replicate n "0"
+        inp |> runParser nnn
+
+
+    let runExtCalcFslex (inp) = 
+        let eclp = extCalcParser ()
+        let tokens = tokenizer inp
+        tokens |> runParser eclp
+
+    let runExtCalc (inp) = 
+        let ecp = extCalcLexerAndParser ()
+        inp |> runParser ecp
+
 
 open FSharp.Charting
 
+let warmup () = 
+    let gcTimeout = 500
+    let ra, rp = A.runNnn (10), Pure.runNnn (10)
+    printfn "Warmup: %d, %d" ra.Length rp.Length
+    GC.Collect()
+    System.Threading.Thread.Sleep(gcTimeout)
+
 let measureTime f = 
+    warmup()
     let sw = new Stopwatch()
     sw.Start()
     let r = f ()
@@ -123,7 +241,7 @@ let doChart () =
     let ev1 = new Event<_>()
     let rec loop n = async {
 
-        let res, time = measureTime (fun _ -> runNnn n)
+        let res, time = measureTime (fun _ -> A.runNnn n)
         printfn "time(%A) res(%d): %A" (time.TotalSeconds) n res
         context.Post(Threading.SendOrPostCallback(fun _ -> ev1.Trigger (n, time.TotalSeconds) |> ignore), null)
         return! loop (n + 2)
@@ -141,14 +259,33 @@ let doChart () =
     Application.Run form
 
 let runExample() = 
-    //runExtCalc "(0+1*2 + (-3)) + 6.0 / 8"
-    //runExtCalc "(0) + 2 + (a - (-5))"
-    doChart ()
-    //let res = runNnn 4 in printfn "res(%d): %A" 4 res
     ()
 
+let chartSimple (n: string option) (log: string option) = 
+    match log with 
+    | Some(log) ->
+        match n with 
+        | Some (names) -> 
+            let results = 
+                File.ReadAllLines(log)
+                |> Seq.map (fun s -> s.Split([| ' '; '\t' |], StringSplitOptions.RemoveEmptyEntries))
+                |> Seq.filter(fun parts -> parts.Length = 3)
+                |> Seq.map (fun parts -> parts.[0], Int32.Parse(parts.[1]), Double.Parse(parts.[2]))
+                |> Seq.toList
+            let dataLines = 
+                names.Split [| ',' |]
+                |> Array.map(fun name -> (name, results |> List.filter (fun (n, _, _) -> n = name)) ) 
+                |> Map.ofList
+
+        | None -> 
+        //Chart.Line()
+        //Application.Run
+    | _ -> failwith "error"
+    
+
+
 let genExtCalc cnt weight = 
-    let varThreshold = 700
+    let varThreshold = 500
     let rnd = new System.Random()
     let vars = [0 .. 10] |> List.map (fun c -> int 'a' + c |> char |> string) |> List.toArray
     let var () = vars.[rnd.Next(0, vars.Length - 1)]
@@ -167,25 +304,21 @@ let genExtCalc cnt weight =
                match rnd.Next(0, 2) with 0 -> "(" + s + ")" | _ -> s
     List.concat [
         vars |> Seq.map (fun v -> v + " = 0;\n") |> Seq.toList
-        [0 .. cnt] |> Seq.map (fun _ -> var () + " = " + genSubExpr weight + ";\n") |> Seq.toList
+        [0 .. cnt - 1] |> Seq.map (fun _ -> var () + " = " + genSubExpr weight + ";\n") |> Seq.toList
         [genSubExpr (weight / 2)]
     ]
     |> String.concat ""
 
-let warmup () = 
-    let r = runNnn (10)
-    printfn "Warmup: %d" r.Length
-    GC.Collect()
-
 let doDebug () = 
-    let inp = " a = 1 "
-    let eclp = extCalcParser ()
+    doChart()
+    //let inp = " a = 2 + 1; a "
+    let inp = " 2 * 1 "
+    let eclp = Pure.extCalcParser ()
     let tokens = tokenizer inp
     printfn "tokens: %A" tokens
     let res = tokens |> runParser eclp
     printfn "%A" res
-    Console.ReadLine () |> ignore
-    None
+    Console.ReadLine () |> ignore; None
 
 let measurePerformance test (n: string option) (log: string option) = 
     let withN f = 
@@ -196,6 +329,7 @@ let measurePerformance test (n: string option) (log: string option) =
             | _, _ -> Some "N must be Int32"
         | _-> Some "N required"
     let withLog f = 
+
         match log with
         | Some(log) -> f log
         | _ -> Some "N required"
@@ -206,28 +340,40 @@ let measurePerformance test (n: string option) (log: string option) =
         | _ -> printfn "%s" s
 
     let extCalcInput n = 
-        genExtCalc 30 n
+        let r = genExtCalc (max 2 <| n / 5) n
+        printfn "extCalcInput: %s" r
+        r
     match test with 
     | "nnn" -> withN <| fun n -> 
-        warmup()
-        let res, time = measureTime (fun _ -> runNnn n)
+        let res, time = measureTime (fun _ -> A.runNnn n)
         printfn "%A" res
-        logRecord test n time log
-        None
+        logRecord test n time log; None
+    | "nnn-pure" -> withN <| fun n -> 
+        let res, time = measureTime (fun _ -> Pure.runNnn n)
+        printfn "%A" res
+        logRecord test n time log; None
     | "extc" -> withN <| fun n ->
         let inp = extCalcInput n
-        warmup()
-        let res, time = measureTime (fun _ -> runExtCalc inp)
+        let res, time = measureTime (fun _ -> A.runExtCalc inp)
         printfn "%A" res
-        logRecord test n time log
-        None
+        logRecord test n time log; None
+    | "extc-pure" -> withN <| fun n ->
+        let inp = extCalcInput n
+        let res, time = measureTime (fun _ -> Pure.runExtCalc inp)
+        printfn "%A" res
+        logRecord test n time log; None
     | "extc-fslex" -> withN <| fun n ->
         let inp = extCalcInput n
-        warmup()
-        let res, time = measureTime (fun _ -> runExtCalcFslex inp)
+        let res, time = measureTime (fun _ -> A.runExtCalcFslex inp)
         printfn "%A" res
-        logRecord test n time log
-        None
+        logRecord test n time log; None
+    | "extc-fslex-pure" -> withN <| fun n ->
+        let inp = extCalcInput n
+        let res, time = measureTime (fun _ -> Pure.runExtCalcFslex inp)
+        printfn "%A" res
+        logRecord test n time log; None
+    | "chart-simple" ->
+        chartSimple n log; None
     | "debug" -> 
         doDebug()
     | _ -> Some "Unknown testcase"
