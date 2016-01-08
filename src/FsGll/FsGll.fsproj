@@ -119,6 +119,9 @@
     <Compile Include="AbstractParsers.fs" />
     <Compile Include="PureParsers.fs" />
     <Compile Include="ExtCalcLexer.fs" />
+    <Compile Include="TestingCommon.fs" />
+    <Compile Include="TestsNonPure.fs" />
+    <Compile Include="TestsPure.fs" />
     <Compile Include="Tests3.fs" />
     <Compile Include="Program.fs" />
     <Content Include="App.config">
