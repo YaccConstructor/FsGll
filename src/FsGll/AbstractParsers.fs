@@ -8,7 +8,7 @@ open System.Text.RegularExpressions
 open FSharpx.Prelude
 open FsGll.InputStream
 
-//let trace s = printfn "%s" s
+//let trace (s: Lazy<string>) = printfn "%s" s.Value
 let trace _ = ()
 
 let mutable foundInDone = 0
@@ -201,7 +201,7 @@ and Trampoline<'a>() as tram =
         let ind = _queue.Count - 1
         let tup = _queue.[ind]
         _queue.RemoveAt ind |> ignore
-        trace "removed"
+        trace <| lazy (sprintf "Removed: %A" tup)
         tup
 
     let step() =
@@ -283,7 +283,7 @@ and Trampoline<'a>() as tram =
                 //notFoundInDone <- notFoundInDone + 1
                 _queue.Add(tuple)
                 parsers.Add(p) |> ignore
-                trace(lazy(sprintf "Added: %A *=> %A\n" tuple))
+                trace(lazy(sprintf "Added: %A\n" tuple))
                 //queuePushed <- queuePushed + 1
 
             match _done.TryGetValue(s) with
