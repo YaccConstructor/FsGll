@@ -132,7 +132,7 @@ let genExtCalc cnt weight =
     let rnd = new System.Random()
     let vars = [0 .. 10] |> List.map (fun c -> int 'a' + c |> char |> string) |> List.toArray
     let var () = vars.[rnd.Next(0, vars.Length - 1)]
-    let num () = match rnd.Next(0, 2) with 0 -> string <| rnd.Next(0, 100000) | _ -> string <| rnd.NextDouble()
+    let num () = match rnd.Next(0, 2) with 0 -> string <| rnd.Next(10000, 99999) | _ -> string <| rnd.NextDouble()
     let operand () = if rnd.Next(0, 1000) < varThreshold then var () else num ()
     let rec genSubExpr = function
         | 1 -> operand ()
@@ -188,6 +188,7 @@ let measurePerformance test (n: string option) (log: string option) =
         let r = genExtCalc (max 2 <| n / 5) n
         printfn "extCalcInput: %s" r
         r
+
     match test with
     | "nnn" -> withN <| fun n ->
         let res, time = measureTime (fun _ -> TestsNonPure.runNnn n)
