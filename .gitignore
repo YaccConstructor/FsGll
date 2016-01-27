@@ -188,5 +188,11 @@ docs/content/release-notes.md
 .fake
 docs/tools/FSharp.Formatting.svclog
 
+
+
 # FSLEX
 src/FsGll/ExtCalcLexer.fs
+
+# Tests
+tests/ECTests/ectest.*
+tests/perf.log*

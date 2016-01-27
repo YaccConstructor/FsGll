@@ -1,3 +1,4 @@
 FSharpx.Core
 FsLexYacc
 NUnitTestAdapter
+FParsec

@@ -3,3 +3,4 @@ NUnit.Runners
 FSharpx.Core
 FsLexYacc
 NUnitTestAdapter
+FParsec

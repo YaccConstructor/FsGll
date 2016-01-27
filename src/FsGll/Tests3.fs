@@ -12,47 +12,10 @@ open FSharp.Charting
 
 open FsGll.ExtCalcLexer
 
-module FPrsc =
-    open FParsec
-    open FsGll.TestingCommon
-    let extCalcLexerAndParser () =
-        let factor, factorRef = createParserForwardedToRef()
-        let term, termRef     = createParserForwardedToRef()
-        let expr, exprRef     = createParserForwardedToRef()
-
-        let chr c = satisfy ((=)c)
-        let whitespace = satisfy <| fun c -> c = ' ' || c = '\n' || c = '\r' || c = '\t'
-        let bws p = many whitespace >>. p .>> many whitespace
-
-        let digits   = many1 (satisfy <| fun c -> Char.IsDigit(c)) |>> (fun s -> s |> Seq.map string |> String.concat "")
-        let notDigit = satisfy (fun c -> Regex.IsMatch(string c, @"[a-zA-Z_]")) |>> string
-        let sym = satisfy (fun c -> Regex.IsMatch(string c, @"[0-9a-zA-Z_]")) |>> string
-
-        let assign     = bws (chr '=')
-        let semicolon  = bws (chr ';')
-        let lparen, rparen = bws (chr '('), bws (chr ')')
-        let value      = pipe2 digits (opt (chr '.' >>. digits)) <| fun a b -> EVal <| Double.Parse(a + defaultArg b "")
-        let variable   = bws <| pipe2 notDigit (many sym) (fun a b -> EVar <| a + (b |> String.concat "") )
-        let minus      = bws (chr '-')
-        let multOp     = bws (chr '*') <|> bws (chr '/')
-        let additiveOp = bws (chr '+') <|> minus
-
-        factorRef     := value <|> variable <|> (pipe2 minus factor (fun _ f -> EUnary(MINUS, f))) <|> (lparen >>. expr .>> rparen)
-        termRef       := pipe3 factor multOp term (fun a x b -> EM (a, x, b)) <|> factor
-        exprRef       := pipe3 term additiveOp expr (fun a x b -> EP (a, x, b)) <|> term
-        let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
-        let pgm = pipe2 (many stmt) expr (curry EPgm)
-        pgm
-
-    let runExtCalc (inp) =
-        let ecp = extCalcLexerAndParser ()
-        run ecp inp
-
-
 let warmup () =
     let gcTimeout = 500
-    let ra, rp = TestsNonPure.runNnn (10), TestsPure.runNnn (10)
-    printfn "Warmup: %d, %d" ra.Length rp.Length
+    let ra, rp, rz = TestsNonPure.runNnn (10), TestsPure.runNnn (10), TestsFParsec.runExtCalc("a =   0; 1 + 2 + (a * 2) - 223")
+    printfn "Warmup: %d, %d, %A" ra.Length rp.Length rz
     GC.Collect()
     System.Threading.Thread.Sleep(gcTimeout)
 
@@ -152,6 +115,14 @@ let genExtCalc cnt weight =
     ]
     |> String.concat ""
 
+let generateExtCalcTests cnt cpath = 
+    for i in 0 .. cnt do
+        let n = (i + 6) * 2
+        let s = genExtCalc (max 2 <| n / 5) n
+        let file = @"ectest." + string i + ".txt"
+        printfn "Generated %d symbols (%s)" (s.Length) file
+        File.WriteAllLines(cpath + @"\" + file, [| s |])
+
 let doDebug () =
     //doChart()
     //let inp = " a = 2 + 1; "
@@ -167,16 +138,18 @@ let doDebug () =
     //let res = tokens |> AbstractParsers.runParser eclp
     
     printfn "%A" res
-    Console.ReadLine () |> ignore; None
+    Console.ReadLine () |> ignore
 
-let measurePerformance test (n: string option) (log: string option) =
-    let withN f =
-        match n with
+let measurePerformance test (n: string option) (log: string option) (ecpath: string option) =
+    let withECPath f = match ecpath with 
+        | Some(ecpath) -> f ecpath
+        | None -> printfn "ecpath parameter required"
+    let withN f = match n with
         | Some(n) ->
             match Int32.TryParse(n) with
             | true, n -> f n
-            | _, _ -> Some "N must be Int32"
-        | _-> Some "N required"
+            | _, _ -> printfn "N must be Int32"
+        | _-> printfn "N required"
     
     let logRecord test n (time: TimeSpan) (log: string option) =
         let s = test + " " + string n + " " + string time.TotalMilliseconds
@@ -184,49 +157,56 @@ let measurePerformance test (n: string option) (log: string option) =
         | Some(log) -> [| s |] |> (curry File.AppendAllLines) log
         | _ -> printfn "%s" s
 
-    let extCalcInput n =
-        let r = genExtCalc (max 2 <| n / 5) n
+//    let extCalcInput n =
+//        let r = genExtCalc (max 2 <| n / 5) n
+//        printfn "extCalcInput: %s" r
+//        r
+    let extCalcInput (n: int) ecpath =
+        let r = File.ReadAllText (ecpath + @"\" + @"ectest." + string n + ".txt")
         printfn "extCalcInput: %s" r
         r
+
     match test with
     | "nnn" -> withN <| fun n ->
         let res, time = measureTime (fun _ -> TestsNonPure.runNnn n)
         printfn "%A" res
-        logRecord test n time log; None
+        logRecord test n time log
     | "nnn-pure" -> withN <| fun n ->
         let res, time = measureTime (fun _ -> TestsPure.runNnn n)
         printfn "%A" res
-        logRecord test n time log; None
-    | "extc" -> withN <| fun n ->
-        let inp = extCalcInput n
+        logRecord test n time log
+    | "extc" -> withN <| fun n ->  withECPath <| fun ecpath ->
+        let inp = extCalcInput n ecpath
         let res, time = measureTime (fun _ -> TestsNonPure.runExtCalc inp)
         printfn "%A" res
-        logRecord test n time log; None
-    | "extc-pure" -> withN <| fun n ->
-        let inp = extCalcInput n
+        logRecord test n time log
+    | "extc-pure" -> withN <| fun n -> withECPath <| fun ecpath ->
+        let inp = extCalcInput n ecpath 
         let res, time = measureTime (fun _ -> TestsPure.runExtCalc inp)
         printfn "%A" res
-        logRecord test n time log; None
-    | "extc-fparsec" -> withN <| fun n ->
-        let inp = extCalcInput n
-        let res, time = measureTime (fun _ -> FPrsc.runExtCalc inp)
+        logRecord test n time log
+    | "extc-fparsec" -> withN <| fun n ->  withECPath <| fun ecpath ->
+        let inp = extCalcInput n ecpath
+        let res, time = measureTime (fun _ -> TestsFParsec.runExtCalc inp)
         printfn "%A" res
-        logRecord test n time log; None
-    | "extc-fslex" -> withN <| fun n ->
-        let inp = extCalcInput n
+        logRecord test n time log
+    | "extc-fslex" -> withN <| fun n ->  withECPath <| fun ecpath ->
+        let inp = extCalcInput n ecpath
         let res, time = measureTime (fun _ -> TestsNonPure.runExtCalcFslex inp)
         printfn "%A" res
-        logRecord test n time log; None
-    | "extc-fslex-pure" -> withN <| fun n ->
-        let inp = extCalcInput n
+        logRecord test n time log
+    | "extc-fslex-pure" -> withN <| fun n -> withECPath <| fun ecpath ->
+        let inp = extCalcInput n ecpath
         let res, time = measureTime (fun _ -> TestsPure.runExtCalcFslex inp)
         printfn "%A" res
-        logRecord test n time log; None
+        logRecord test n time log
+    | "generate-ec" -> 
+        withN <| fun n -> withECPath <| fun ecpath ->  generateExtCalcTests n ecpath
     | "chart-simple" ->
-        chartSimple n log; None
+        chartSimple n log
     | "debug" ->
         doDebug()
-    | _ -> Some "Unknown testcase"
+    | _ -> printfn "Unknown testcase"
 
 //    let sw = new Stopwatch()
 //    sw.Start()

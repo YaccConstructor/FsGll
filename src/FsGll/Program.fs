@@ -36,12 +36,10 @@ let main argv =
     let log = getArg "log"
     let test = getArg "test"
     let n = getArg "n"
+    let ecpath = getArg "ecpath"
     if test.IsSome then 
-        match measurePerformance test.Value n log with
-        | Some(e) -> printfn "%s" e
-        | None -> ()
+        measurePerformance test.Value n log ecpath 
     else 
         //runExample ()
-        printfn "Usage: <pgm> -test=<Test> [-n=<N>] [-log=<Log>]"
-        Console.ReadLine() |> ignore
+        printfn "Usage: <pgm> -test=<Test> [-n=<N>] [-log=<Log>] [-ecpath=<ExtCalc tests dir path>]"
     0

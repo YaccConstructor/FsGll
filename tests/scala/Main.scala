@@ -1,4 +1,4 @@
-import java.io.FileWriter
+import java.io.{FileReader, FileWriter}
 
 import com.codecommit.gll.{Parsers, RegexParsers}
 
@@ -8,9 +8,9 @@ import com.codecommit.gll.{Parsers, RegexParsers}
 
 
 object GrammarNNN extends Parsers {
-  def atom : Parser[String] = literal("0")
+  val atom : Parser[String] = literal("0")
   lazy val expr: Parser[String] = expr ~ expr ~ expr ^^ { _ + _ + _ } | expr ~ expr ^^ { _ + _ } | atom
-  def runNnn(n: Int) : Array[String] = {
+  def runNnn(n: Int) : Array[Any] = {
     expr("0" * n).toArray
   }
 }
@@ -26,7 +26,7 @@ object GrammarExtCalc extends RegexParsers {
   case class Stmt(v: EVar, e: AST) extends AST
   case class Pgm(s: List[Stmt], e: AST) extends AST
 
-  def bws[A](p: Parser[A]) = (("\s".r)*) ~> p <~ (("\s".r)*)
+  def bws[A](p: Parser[A]) = (("\\s".r)*) ~> p <~ (("\\s".r)*)
 
   lazy val digits = (("[0-9]".r)+) ^^ { _.mkString("") }
   lazy val notDigit : Parser[String] = "[a-zA-Z_]".r
@@ -38,30 +38,35 @@ object GrammarExtCalc extends RegexParsers {
   lazy val additiveOp = bws("+") | bws("-")
 
   lazy val factor : Parser[AST] = value | variable | ((bws("-") ~ factor) ^^ EUnary) | (bws("(") ~> expr <~ bws(")"))
-  lazy val term = (factor ~ multOp ~ term) ^^ { EMultiplicative(_, _, _) }
-  lazy val expr: Parser[AST] = (term ~ additiveOp ~ expr) ^^ EAdditive
+  lazy val term: Parser[AST] = ((factor ~ multOp ~ term) ^^ EMultiplicative) | factor
+  lazy val expr: Parser[AST] = ((term ~ additiveOp ~ expr) ^^ EAdditive) | term
   lazy val stmt = ((variable <~ bws("=")) ~ (expr <~ bws(";"))) ^^ Stmt
   lazy val pgm = (stmt*) ~ expr ^^ Pgm
+
+  def runExtCalc(s: String) : Any = {
+    pgm(s)
+  }
 }
 
 object Main extends Parsers {
   def warmup () = {
     val gcTimeout = 500
-    val ra= GrammarNNN.runNnn(10)
-    println("Warmup: " + ra.length)
+    val ra = GrammarNNN.runNnn(10)
+    println("Warmup: " + ra.length + ra)
     System.gc()
     Thread.sleep(gcTimeout)
   }
   def measureTime(f: Unit => Any) : (Any, Long) = {
     warmup()
     val startTime = System.nanoTime()
+    println("running...")
     val r = f()
     val estimatedTime = System.nanoTime() - startTime
-    (r, estimatedTime / (1000 * 1000))
+    (r, estimatedTime / 1000)
   }
 
   def logRecord(test: String, n: Int, time: Long, log: Option[String]) = {
-    val s = test + " " + n.toString + " " + (time.toDouble / 1000.0).toString
+    val s = test + " " + n.toString + " " + (time.toDouble / 1000.0).toString + "\n"
     log match {
       case Some(log) => {
         val fw = new FileWriter(log, true)
@@ -71,18 +76,25 @@ object Main extends Parsers {
       case None => println(s)
     }
   }
+  def extCalcInput(n: Int, ecpath: String) = {
+    scala.io.Source.fromFile(ecpath + "\\ectest." + n.toString + ".txt").mkString
+  }
 
-  def measurePerformance(test: String, n: Option[String], log: Option[String]) = {
-    val withN = (f: Int => Unit) => {
-        f (n.get.toInt)
-    }
-
+  def measurePerformance(test: String, n: Option[String], log: Option[String], ecpath: Option[String]) = {
+    val withN = (f: Int => Unit) => { f (n.get.toInt) }
+    val withECPath = (f: String => Unit) => { f (ecpath.get) }
     test match {
-      case "nnn" => withN { n =>
+      case "scala-nnn" => withN { n =>
         val (res, time) = measureTime ( { _ => GrammarNNN.runNnn(n) } )
         println(res)
         logRecord(test, n, time, log)
       }
+      case "scala-extc" => withN { n => withECPath { ecpath =>
+        val inp = extCalcInput(n, ecpath)
+        val (res, time) = measureTime({ _ => GrammarExtCalc.runExtCalc(inp) })
+        println(res)
+        logRecord(test, n, time, log)
+      }}
     }
   }
 
@@ -94,8 +106,9 @@ object Main extends Parsers {
     val log = getArg("log")
     val test = getArg("test")
     val n = getArg("n")
+    val ecpath = getArg("ecpath")
     test match {
-      case Some(test) => { measurePerformance (test, n, log) }
+      case Some(test) => { measurePerformance (test, n, log, ecpath) }
       case _ => println("Usage: <pgm> -test=<Test> [-n=<N>] [-log=<Log>]")
     }
     //val res = expr("0" * 12).toArray
