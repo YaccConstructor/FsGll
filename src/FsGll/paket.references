@@ -1,4 +1,6 @@
 FSharpx.Core
+Rx-Main
+Rx-Linq
 FsLexYacc
-NUnitTestAdapter
+FSharp.Charting
 FParsec

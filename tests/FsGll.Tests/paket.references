@@ -1,6 +1,9 @@
+FSharpx.Core
+Rx-Main
+Rx-Linq
+FsLexYacc
+FSharp.Charting
+FParsec
+group Test
 NUnit
 NUnit.Runners
-FSharpx.Core
-FsLexYacc
-NUnitTestAdapter
-FParsec
