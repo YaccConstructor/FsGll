@@ -63,7 +63,9 @@ let nnnParser () =
     let tok c = satisfy ((=)c)
     let digit = tok '0' |>> string
     let expr, exprRef = createParserForwardedToRef<_, string>("expr")
-    exprRef :=  (pipe2 expr expr (+)) <|> (digit)
+    exprRef :=  (pipe3 expr expr expr (fun a b c -> a + b + c)) 
+            <|> (pipe2 expr expr (+)) 
+            <|> (digit)
     expr
 
 let ambigExpr () = 
