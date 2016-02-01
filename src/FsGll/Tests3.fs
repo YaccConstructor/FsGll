@@ -44,9 +44,9 @@ let doChart () =
     loop 4 |> Async.Start
 
     let rand = new Random()
-    let obs = Observable.Interval(TimeSpan.FromSeconds(1.0)).
-                 ObserveOn(WindowsFormsSynchronizationContext.Current)
-                |> Observable.map(fun _ -> DateTime.Now.ToShortTimeString(),rand.Next(0,21))
+//    let obs = Observable.Interval(TimeSpan.FromSeconds(1.0)).
+//                 ObserveOn(WindowsFormsSynchronizationContext.Current)
+//                |> Observable.map(fun _ -> DateTime.Now.ToShortTimeString(),rand.Next(0,21))
 
     let one  = LiveChart.FastLineIncremental(ev1.Publish, Name="Simple Example")
 

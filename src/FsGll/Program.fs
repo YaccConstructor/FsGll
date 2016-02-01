@@ -24,6 +24,9 @@ open Tests3
     
 [<EntryPoint>]
 let main argv =
+    let res = TestsPure.runExtCalc("a = 0; var = a + 1; a - var * 2 + 837 / (x-3)   ")
+    printfn "%A" res
+    failwith "here"
     //printfn "%s" (genExtCalc 50 10)
     //runExample()
     let getArg arg = 

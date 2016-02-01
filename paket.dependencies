@@ -3,6 +3,8 @@ nuget FParsec
 nuget FSharp.Charting
 nuget FSharpx.Core
 nuget FsLexYacc
+nuget FsUnit
+nuget NUnitTestAdapter
 nuget Rx-Linq
 nuget Rx-Main
 

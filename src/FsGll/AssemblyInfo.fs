@@ -3,7 +3,7 @@ open System.Reflection
 
 [<assembly: AssemblyTitleAttribute("FsGll")>]
 [<assembly: AssemblyProductAttribute("FsGll")>]
-[<assembly: AssemblyDescriptionAttribute("An parser combinator library based on the GLL algorithm for F#")>]
+[<assembly: AssemblyDescriptionAttribute("FsGll")>]
 [<assembly: AssemblyVersionAttribute("1.0")>]
 [<assembly: AssemblyFileVersionAttribute("1.0")>]
 do ()

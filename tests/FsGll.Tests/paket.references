@@ -4,6 +4,8 @@ Rx-Linq
 FsLexYacc
 FSharp.Charting
 FParsec
+NUnitTestAdapter
+FsUnit
 group Test
 NUnit
 NUnit.Runners

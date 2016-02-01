@@ -4,3 +4,5 @@ Rx-Linq
 FsLexYacc
 FSharp.Charting
 FParsec
+NUnitTestAdapter
+FsUnit
