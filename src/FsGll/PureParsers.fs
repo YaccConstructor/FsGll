@@ -32,8 +32,6 @@ type Unique() =
     static let mutable (au : TUid) = 0
     let uid : TUid = Interlocked.Increment(&au)
     member this.Uid = uid
-
-    // Some dirty code to store Unique in Set
     interface IComparable with 
         override this.CompareTo that = 
             if this.Equals(that) then 0
@@ -43,10 +41,11 @@ type Unique() =
                     let h1, h2 = this.GetHashCode(), that.GetHashCode()
                     if h1 <> h2 
                     then h1 - h2 
-                    else (if uid = that.Uid then 0 else failwith msgLibraryError) // TODO uid - that.Uid 
+                    else uid - that.Uid //else (if uid = that.Uid then 0 else failwith msgLibraryError) // TODO uid - that.Uid 
                 | _ -> invalidArg "that" msgLibraryError
-    override this.Equals _ = false 
-    override this.GetHashCode() = uid.GetHashCode()
+
+    override this.Equals that = match that with :? Unique as that -> uid = that.Uid | _ -> false
+    override this.GetHashCode () = uid.GetHashCode()
 
 [<AbstractClass>]
 type GParserResult<'a> (tail: InputStream<'a>) = 
@@ -88,10 +87,6 @@ let parserResult<'a, 'r when 'r: equality> (r: GParserResult<'a>) =
     | :? GFailure<'a> as fail -> Failure (fail.Message, fail.Tail)
     | _ -> failwith msgLibraryError
 
-
-let mutable private gParserAutoincrement = 0
-let mutable private disjunctiveParserChainInvokations = 0
-
 open FSharpx.State
 
 let inline modify<'s> (f: 's -> 's) = getState >>= (putState << f)
@@ -110,11 +105,8 @@ and Continuation<'a>(f: GParserResult<'a> -> PState<'a>) =
     member this.F : (GParserResult<'a> -> PState<'a>)  = f
     static member New fn = new Continuation<'a>(fn)
     override this.Equals that = 
-        //Object.ReferenceEquals (f, (that :?> Continuation<'a>).F) |> ignore
-        //let refeq = Object.ReferenceEquals (f, (that :?> Continuation<'a>).F)
         let tobj = (that :?> Continuation<'a>).F
-        let eqeq = (f :> Object).Equals(tobj)
-        eqeq
+        (f :> Object).Equals(tobj)
     override this.GetHashCode() = base.GetHashCode()
     
 and RSet<'a> = Set<GParserResult<'a> >
@@ -136,18 +128,19 @@ and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () =
         { 
             Queue = []; Done = Map.empty; Popped = Map.empty; DisRes = Map.empty
             Backlinks = Map.empty; Saved = Map.empty; Stopped = false
-            Successes = Set.empty; Failures = Set.empty; Postrace = []
+            Results = Set.empty; Postrace = []
         }
         |> 
         state {
             do! this.Chain(inp) (Continuation<_>.New(fun res ->
-                if res.Succeeded && not res.Tail.IsEmpty 
-                then failure "UnexpectedTrailingChars" (res.Tail) else res
-                |> T.AddResult
+                let r = if res.Succeeded && not res.Tail.IsEmpty 
+                        then failure "UnexpectedTrailingChars" (res.Tail) else res
+                modify <| fun t -> { t with Results = t.Results.Add(r) }
             ))
             do! T.Run ()
             let! t = getState
-            return (if t.Successes.Count = 0 then t.Failures else t.Successes) |> Seq.toList
+            let successes, failures = t.Results |> Seq.toList |> List.partition (fun r -> r.Succeeded) 
+            return (if List.isEmpty successes then failures else successes)
         } 
         |> fst
         
@@ -157,12 +150,11 @@ and [<AbstractClass>] TerminalParser<'a, 'r when 'r : equality> () =
 
     abstract member Parse : InputStream<'a> -> GParserResult<'a>
 
+    override this.Chain (inp) (f) = this.Parse inp |> f.F
     override this.Apply (inp: InputStream<'a>) = 
             match this.Parse(inp) with 
             | :? GSuccess<'a, 'r> as succ1 -> [succ1]
             | x -> [x]
-    
-    override this.Chain (inp) (f) = this.Parse inp |> f.F
 
 and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Parser<'a, 'r>) as disj =
     inherit NonTerminalParser<'a, 'r>()
@@ -209,17 +201,12 @@ and Trampoline<'a> = {
     Saved: HOMap<GParserResult<'a>, FSet<'a> >
 
     Stopped: bool
-    Successes: SSet<'a>
-    Failures: SSet<'a>
+    Results: SSet<'a>
+
     Postrace: string list
     DisRes: Map<TUid, SSet<'a> >
 } 
 and T () =
-     
-    static member AddResult<'a> (r: GParserResult<'a>) : PState<'a> = 
-        getState >>= fun t ->
-            putState <| if r.Succeeded then { t with Successes = t.Successes.Add(r) }
-                                       else { t with Failures = t.Failures.Add(r) }
 
     static member Run<'a> () : PState<'a> = state { 
         let! t = getState
@@ -434,7 +421,7 @@ let notFollowedBy (p: TerminalParser<'a, 'r>) : Parser<'a, unit> =
 let private dummyParser<'a, 'r when 'r : equality> = 
    { new TerminalParser<'a, 'r>() with override this.Parse s = failwith msgDummyUsed } :> Parser<'a, 'r>
 
-let createParserForwardedToRef<'a, 'r when 'r : equality>(name:string) = 
+let createParserForwardedToRef<'a, 'r when 'r : equality>(name: string) = 
     let r = ref dummyParser<'a, 'r>
     { new NonTerminalParser<'a, 'r>() with 
       override this.Chain s f = (!r).Chain s f } :> Parser<'a, 'r>, r
