@@ -66,7 +66,9 @@
     <Compile Include="ExtCalcLexer.fs" />
     <Compile Include="AbstractParsers.fs" />
     <Compile Include="PureParsers.fs" />
+    <Compile Include="Parsers.Incremental.fs" />
     <Compile Include="TestingCommon.fs" />
+    <Compile Include="Tests.Incremental.fs" />
     <Compile Include="TestsFParsec.fs" />
     <Compile Include="TestsNonPure.fs" />
     <Compile Include="TestsPure.fs" />
