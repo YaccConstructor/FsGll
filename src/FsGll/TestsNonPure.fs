@@ -46,7 +46,7 @@ let extCalcLexerAndParser () =
     let assign     = bws (chr '=')
     let semicolon  = bws (chr ';')
     let lparen, rparen = bws (chr '('), bws (chr ')')
-    let value      = pipe2 digits (opt (chr '.' >>. digits)) <| fun a b -> EVal <| Double.Parse(a + defaultArg b "")
+    let value      = pipe2 digits (opt (chr '.' >>. digits)) <| fun a b -> EVal <| Double.Parse(a + "." + defaultArg b "")
     let variable   = bws <| pipe2 notDigit (many sym) (fun a b -> EVar <| a + (b |> String.concat "") )
     let minus      = bws (chr '-')
     let multOp     = bws (chr '*') <|> bws (chr '/')
