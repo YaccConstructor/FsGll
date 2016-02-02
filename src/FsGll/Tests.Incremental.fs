@@ -55,3 +55,6 @@ let incrementalTest () =
         
     let res1 = runParser part.Parser "+1)"
     printfn "%A" res1
+    let res2 = runParser part.Parser "-7)"
+    printfn "%A" res2
+    

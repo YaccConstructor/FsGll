@@ -10,20 +10,21 @@ type StreamIndex = int
 type InputStream<'a> () = 
     abstract member Inside : StreamIndex -> bool
     abstract member Item : StreamIndex -> 'a
-    abstract member Extend : InputStream<'a> -> unit
+    abstract member Extend : InputStream<'a> -> InputStream<'a>
+    abstract member End : StreamIndex
     //override this.ToString() = underlying |> Seq.map (fun x -> x.ToString()) |> Seq.fold (+) "" 
 
-type ArrayInputStream<'a> (initarr: 'a []) = 
+type ArrayInputStream<'a> (arr: 'a []) = 
     inherit InputStream<'a>()
-    let mutable arr = initarr
     member this.UnderlyingArray = arr
     override this.Inside i = i < arr.Length
     override this.Item i = arr.[i]
     override this.ToString() = sprintf "%A" <| arr
     override this.Extend(s: InputStream<'a>) = 
         match s with 
-        | :? ArrayInputStream<'a> as s -> arr <- [arr; s.UnderlyingArray] |> Array.concat
+        | :? ArrayInputStream<'a> as s -> new ArrayInputStream<'a>([arr; s.UnderlyingArray] |> Array.concat) :> InputStream<'a>
         | _ -> failwith "different input streams not allowed"
+    override this.End = arr.Length
 
 //let trace (s: Lazy<string>) = printfn "%s" s.Value
 let trace _ = ()
@@ -110,9 +111,14 @@ and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () =
 
 and PartialParser<'a, 'r when 'r : equality> (t: Trampoline<'a>, successes: HashSet<GParserResult<'a> >, failures: HashSet<GParserResult<'a> >) = 
     inherit Parser<'a, 'r> ()
+    let stream: InputStream<'a> = t.Stream
+    let _pastEnd = new HashSet<_>(t.PastEnd |> Seq.map id)
     override this.Apply(inp: InputStream<'a>) = 
-        t.Stream.Extend(inp)
-        for (p, s, f) in t.PastEnd do
+        let ind = stream.End
+        t.PastEnd.Clear()
+        //t.Backlinks.Keys |> Seq.filter (fun k -> k >= ind )
+        t.Stream <- stream.Extend(inp)
+        for (p, s, f) in _pastEnd do
             p.Chain(t, s) f
             //t.Add (p, s) f
         t.Run()
@@ -151,8 +157,8 @@ and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Pa
     //interface IComparable with
         //member x.CompareTo y = compare (x.GetHashCode()) (y.GetHashCode())
 
-and Trampoline<'a>(stream: InputStream<'a>) as tram =
-
+and Trampoline<'a>(initStream: InputStream<'a>) as tram =
+    let mutable stream = initStream
     let _pastEnd = new HashSet<GParser<'a> * StreamIndex * Continuation<'a> >()
     // R
     let postrace = new ResizeArray<string>()
@@ -219,13 +225,13 @@ and Trampoline<'a>(stream: InputStream<'a>) as tram =
 //            _pastEnd.Add(p, s, cont) |> ignore
 //        else 
         p.Chain (tram, s) cont
-
+        
+    member this.Stream with get () : InputStream<'a> = stream and set (value : InputStream<'a>) = stream <- value
     member this.Saved  = saved
     member this.Popped = popped
     member this.Done   = _done
     member this.Backlinks = backlinks
     member this.Postrace = postrace
-    member this.Stream : InputStream<'a> = stream
     member this.Queue = _queue
     member this.PastEnd : HashSet<GParser<'a> * StreamIndex * Continuation<'a> > = _pastEnd
     member this.Stop() : unit = stopped <- true
