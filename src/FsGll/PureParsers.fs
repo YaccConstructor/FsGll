@@ -336,7 +336,7 @@ let opt<'a, 'r when 'r : equality> (p: Parser<'a, 'r>) =
     { new NonTerminalParser<'a, 'r option>() with 
         override nt.Chain(s) (f) : PState<'a> = state {
             do! (success<'a, 'r option> None s) |> f.F
-            do! T.Add(p, s) (Cont.WithSucc (fun r -> success (Some r.Value) r.Tail) f) }
+            do! T.Add(p, s) (Cont.WithSucc (fun r -> success<'a, 'r option> (Some r.Value) r.Tail) f) }
     } :> Parser<'a, 'r option>
 
 let epsilon<'a> = preturn ()
