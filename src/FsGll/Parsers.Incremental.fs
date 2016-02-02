@@ -113,9 +113,12 @@ and PartialParser<'a, 'r when 'r : equality> (t: Trampoline<'a>, successes: Hash
     override this.Apply(inp: InputStream<'a>) = 
         t.Stream.Extend(inp)
         for (p, s, f) in t.PastEnd do
-            t.Add (p, s) f
+            p.Chain(t, s) f
+            //t.Add (p, s) f
         t.Run()
-        if t.PastEnd.Count > 0 then [new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t, successes, failures))] 
+        if t.PastEnd.Count > 0 then 
+            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t, successes, failures)) :> GParserResult<'a>
+            part :: (successes |> Seq.toList)
         else (if successes.Count = 0 then failures else successes) |> Seq.toList
     override this.Chain(_, _) _ = failwith "Not implemented for PartialParser"
 
@@ -180,7 +183,7 @@ and Trampoline<'a>(stream: InputStream<'a>) as tram =
     let step() =
         let p, s = remove()
         //postrace.Add(sprintf "%d %A" s.Ind p)
-        p.Chain (tram, s) <| fun res ->
+        let cont = fun (res: GParserResult<'a>) ->
             match popped.TryGetValue(s) with
             | true, parsers-> 
                 if not <| parsers.ContainsKey(p) then
@@ -212,6 +215,10 @@ and Trampoline<'a>(stream: InputStream<'a>) as tram =
                     //savedToSaved <- savedToSaved + 1
                     f res 
                 )
+//        if not (stream.Inside(s)) && p.Consuming then 
+//            _pastEnd.Add(p, s, cont) |> ignore
+//        else 
+        p.Chain (tram, s) cont
 
     member this.Saved  = saved
     member this.Popped = popped
@@ -231,7 +238,7 @@ and Trampoline<'a>(stream: InputStream<'a>) as tram =
     member this.Add (p: GParser<'a>, s: StreamIndex) (f: GParserResult<'a> -> unit) : unit = 
         if not (stream.Inside(s)) && p.Consuming then 
             _pastEnd.Add(p, s, f) |> ignore
-        else 
+        else
             let tuple = (p, s)
             match backlinks.TryGetValue(s) with
             | true, parsers-> 

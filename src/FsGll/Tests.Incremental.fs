@@ -43,10 +43,15 @@ let runExtCalc (inp) =
     inp |> runParser ecp
 
 let incrementalTest () = 
-    let res = runExtCalc("1*0")
+    let res = runExtCalc("(1*0")
     //let res = TestsNonPure.runExtCalc("1*0")
     //let res = TestsPure.runExtCalc("a = 0; var = a + 1; a - var * 2 + 837 / (x-3)   ")
     printfn "%A" res
-    let part = (res |> List.find(function :? GPartial<char, E> -> true | _ -> false)) :?> GPartial<char, E>
-    let res1 = runParser part.Parser "+1"
+    let partials = 
+        res 
+        |> List.filter (function :? GPartial<char, E> -> true | _ -> false) 
+        |> List.map (fun x -> x :?> GPartial<char, E>)
+    let part = List.head partials
+        
+    let res1 = runParser part.Parser "+1)"
     printfn "%A" res1
