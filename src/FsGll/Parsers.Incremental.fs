@@ -115,11 +115,12 @@ and PartialParser<'a, 'r when 'r : equality> (t: Trampoline<'a>, successes: Hash
     let _pastEnd = new HashSet<_>(t.PastEnd |> Seq.map id)
     override this.Apply(inp: InputStream<'a>) = 
         let ind = stream.End
-        t.PastEnd.Clear()
-        //t.Backlinks.Keys |> Seq.filter (fun k -> k >= ind )
+
+        t.PrepareReparse(ind + 1)
+
         t.Stream <- stream.Extend(inp)
-        for (p, s, f) in _pastEnd do
-            p.Chain(t, s) f
+        for (p, f) in _pastEnd do
+            p.Chain(t, ind) f
             //t.Add (p, s) f
         t.Run()
         if t.PastEnd.Count > 0 then 
@@ -152,14 +153,12 @@ and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Pa
                     f res
                     (res) |> results.Add |> ignore
             )
-            
         )
     //interface IComparable with
         //member x.CompareTo y = compare (x.GetHashCode()) (y.GetHashCode())
-
 and Trampoline<'a>(initStream: InputStream<'a>) as tram =
     let mutable stream = initStream
-    let _pastEnd = new HashSet<GParser<'a> * StreamIndex * Continuation<'a> >()
+    let _pastEnd = new HashSet<GParser<'a> * Continuation<'a> >()
     // R
     let postrace = new ResizeArray<string>()
     let _queue = new ResizeArray<GParser<'a> * StreamIndex>()
@@ -233,8 +232,27 @@ and Trampoline<'a>(initStream: InputStream<'a>) as tram =
     member this.Backlinks = backlinks
     member this.Postrace = postrace
     member this.Queue = _queue
-    member this.PastEnd : HashSet<GParser<'a> * StreamIndex * Continuation<'a> > = _pastEnd
+    member this.PastEnd : HashSet<GParser<'a> * Continuation<'a> > = _pastEnd
     member this.Stop() : unit = stopped <- true
+
+    member this.PrepareReparse (ind: StreamIndex) : unit = 
+        _pastEnd.Clear()
+        _done.Keys 
+        |> Seq.filter (fun k -> k >= ind) 
+        |> Seq.toList 
+        |> List.iter (_done.Remove >> ignore) 
+        backlinks.Keys 
+        |> Seq.filter (fun k -> k >= ind) 
+        |> Seq.toList 
+        |> List.iter (backlinks.Remove >> ignore) 
+        popped.Keys 
+        |> Seq.filter (fun k -> k >= ind) 
+        |> Seq.toList 
+        |> List.iter (popped.Remove >> ignore) 
+        saved.Keys
+        |> Seq.filter (fun r -> r.Tail >= ind)
+        |> Seq.toList 
+        |> List.iter (saved.Remove >> ignore) 
 
     // L_0
     member this.Run () : unit =
@@ -243,7 +261,7 @@ and Trampoline<'a>(initStream: InputStream<'a>) as tram =
             
     member this.Add (p: GParser<'a>, s: StreamIndex) (f: GParserResult<'a> -> unit) : unit = 
         if not (stream.Inside(s)) && p.Consuming then 
-            _pastEnd.Add(p, s, f) |> ignore
+            _pastEnd.Add(p, f) |> ignore
         else
             let tuple = (p, s)
             match backlinks.TryGetValue(s) with

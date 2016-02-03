@@ -42,19 +42,22 @@ let runExtCalc (inp) =
     let ecp = extCalcLexerAndParser ()
     inp |> runParser ecp
 
-let incrementalTest () = 
-    let res = runExtCalc("(1*0")
-    //let res = TestsNonPure.runExtCalc("1*0")
-    //let res = TestsPure.runExtCalc("a = 0; var = a + 1; a - var * 2 + 837 / (x-3)   ")
-    printfn "%A" res
+let getIncremental<'a, 'b when 'b: equality> (lst: GParserResult<'a> list) = 
     let partials = 
-        res 
-        |> List.filter (function :? GPartial<char, E> -> true | _ -> false) 
-        |> List.map (fun x -> x :?> GPartial<char, E>)
+        lst 
+        |> List.filter (function :? GPartial<'a, 'b> -> true | _ -> false) 
+        |> List.map (fun x -> x :?> GPartial<'a, 'b>)
     let part = List.head partials
-        
-    let res1 = runParser part.Parser "+1)"
-    printfn "%A" res1
-    let res2 = runParser part.Parser "-7)"
-    printfn "%A" res2
+    part.Parser
+
+let incrementalTest () = 
+    let res = runExtCalc("1+2*")
+    printfn "%A" res
+    let f = getIncremental<_, E> res
+    let g = runParser f "(3"
+    let g' = getIncremental<_, E> g
+    let h1 = runParser f "3+4"
+    let h2 = runParser g' "+4)"
+    printfn "%A" h1
+    printfn "%A" h2
     
