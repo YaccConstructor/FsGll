@@ -93,7 +93,7 @@ and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () =
     inherit Parser<'a, 'r> ()
     
     override this.Apply (inp: InputStream<'a>) = 
-        let t = new Trampoline<'a>(inp)
+        let t = Trampoline<'a>.New(inp)
 
         let (successes, failures) = new RSet<'a>(), new RSet<'a>()
         
@@ -108,20 +108,20 @@ and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () =
             let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t, successes, failures)) :> GParserResult<'a>
             part :: (successes |> Seq.toList)
         else (if successes.Count = 0 then failures else successes) |> Seq.toList
-
-and PartialParser<'a, 'r when 'r : equality> (t: Trampoline<'a>, successes: HashSet<GParserResult<'a> >, failures: HashSet<GParserResult<'a> >) = 
+// Implemented with shallow copying trampoline
+and PartialParser<'a, 'r when 'r : equality> (oldT: Trampoline<'a>, successes: HashSet<GParserResult<'a> >, failures: HashSet<GParserResult<'a> >) = 
     inherit Parser<'a, 'r> ()
-    let stream: InputStream<'a> = t.Stream
-    let _pastEnd = new HashSet<_>(t.PastEnd |> Seq.map id)
+    let stream: InputStream<'a> = oldT.Stream
+    let _pastEnd = new HashSet<_>(oldT.PastEnd |> Seq.map id)
     override this.Apply(inp: InputStream<'a>) = 
         let ind = stream.End
 
-        t.PrepareReparse(ind + 1)
+        let t = oldT.ContinuedAt(inp)
 
         t.Stream <- stream.Extend(inp)
         for (p, f) in _pastEnd do
-            p.Chain(t, ind) f
-            //t.Add (p, s) f
+            //p.Chain(t, ind) f
+            t.Add (p, ind) f
         t.Run()
         if t.PastEnd.Count > 0 then 
             let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t, successes, failures)) :> GParserResult<'a>
@@ -156,27 +156,15 @@ and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Pa
         )
     //interface IComparable with
         //member x.CompareTo y = compare (x.GetHashCode()) (y.GetHashCode())
-and Trampoline<'a>(initStream: InputStream<'a>) as tram =
+and Trampoline<'a>(initStream: InputStream<'a>, 
+                   _done: ResizeArray<HashSet<GParser<'a> > >,
+                   popped: ResizeArray<HOMap<GParser<'a>, SSet<'a> > >,
+                   backlinks: ResizeArray<HOMap<GParser<'a>, FSet<'a> > >,
+                   saved: HOMap<GParserResult<'a>, FSet<'a> >) as tram =
     let mutable stream = initStream
-    let _pastEnd = new HashSet<GParser<'a> * Continuation<'a> >()
     // R
-    let postrace = new ResizeArray<string>()
-    let _queue = new ResizeArray<GParser<'a> * StreamIndex>()
-
-    // U_j
-    let _done = new Dictionary<StreamIndex, HashSet<GParser<'a> > >()
-
-    // P
-    let popped = new Dictionary<StreamIndex, HOMap<GParser<'a>, SSet<'a> > >()
-
-    // GSS back edges
-    let backlinks = new Dictionary<StreamIndex, HOMap<GParser<'a>, FSet<'a> > >()
-
-    // prevents divergence in cyclic GSS traversal
-    let saved = new HOMap<GParserResult<'a>, FSet<'a> >()
-
-    let mutable stopped = false
-    let hasNext() = _queue.Count > 0
+    let _queue = new ResizeArray<GParser<'a> * StreamIndex>() 
+    let _pastEnd = new HashSet<GParser<'a> * Continuation<'a> >()
 
     let remove() = 
         let ind = _queue.Count - 1
@@ -189,13 +177,14 @@ and Trampoline<'a>(initStream: InputStream<'a>) as tram =
         let p, s = remove()
         //postrace.Add(sprintf "%d %A" s.Ind p)
         let cont = fun (res: GParserResult<'a>) ->
-            match popped.TryGetValue(s) with
-            | true, parsers-> 
+            while popped.Count <= s do popped.Add(null)
+            if popped.[s] <> null then
+                let parsers = popped.[s]
                 if not <| parsers.ContainsKey(p) then
                     parsers.Add(p, new SSet<'a>() )
-            | _, _ ->
+            else
                 let nmap = new HOMap<GParser<'a>, SSet<'a> >() in nmap.Add(p, new SSet<'a>() )
-                popped.Add(s, nmap)
+                popped.[s] <- nmap
 
             if res.Succeeded then
                 popped.[s].[p].Add(res) |> ignore
@@ -225,38 +214,34 @@ and Trampoline<'a>(initStream: InputStream<'a>) as tram =
 //        else 
         p.Chain (tram, s) cont
         
+
+    static member New<'a>(s) = 
+        new Trampoline<'a>(s,  
+                       _done = new ResizeArray<HashSet<GParser<'a> > >(), // U_j
+                       popped = new ResizeArray<HOMap<GParser<'a>, SSet<'a> > >(), // P
+                       backlinks = new ResizeArray<HOMap<GParser<'a>, FSet<'a> > >(), // GSS back edges
+                       saved = new HOMap<GParserResult<'a>, FSet<'a> >() // prevents divergence in cyclic GSS traversal
+                       )
+    
     member this.Stream with get () : InputStream<'a> = stream and set (value : InputStream<'a>) = stream <- value
     member this.Saved  = saved
     member this.Popped = popped
     member this.Done   = _done
     member this.Backlinks = backlinks
-    member this.Postrace = postrace
     member this.Queue = _queue
     member this.PastEnd : HashSet<GParser<'a> * Continuation<'a> > = _pastEnd
-    member this.Stop() : unit = stopped <- true
 
-    member this.PrepareReparse (ind: StreamIndex) : unit = 
-        _pastEnd.Clear()
-        _done.Keys 
-        |> Seq.filter (fun k -> k >= ind) 
-        |> Seq.toList 
-        |> List.iter (_done.Remove >> ignore) 
-        backlinks.Keys 
-        |> Seq.filter (fun k -> k >= ind) 
-        |> Seq.toList 
-        |> List.iter (backlinks.Remove >> ignore) 
-        popped.Keys 
-        |> Seq.filter (fun k -> k >= ind) 
-        |> Seq.toList 
-        |> List.iter (popped.Remove >> ignore) 
-        saved.Keys
-        |> Seq.filter (fun r -> r.Tail >= ind)
-        |> Seq.toList 
-        |> List.iter (saved.Remove >> ignore) 
+    member this.ContinuedAt (newTail: InputStream<'a>) : Trampoline<'a> = 
+        let ind = stream.End
+        new Trampoline<'a>(stream.Extend(newTail), 
+                           new ResizeArray<_>(_done), 
+                           new ResizeArray<_>(popped), 
+                           new ResizeArray<_>(backlinks), 
+                           new Dictionary<_,_>(saved |> Seq.map (fun v -> (v.Key, v.Value)) |> dict))
 
     // L_0
     member this.Run () : unit =
-        while (hasNext() && not stopped) do
+        while (_queue.Count > 0) do
             step()
             
     member this.Add (p: GParser<'a>, s: StreamIndex) (f: GParserResult<'a> -> unit) : unit = 
@@ -264,45 +249,44 @@ and Trampoline<'a>(initStream: InputStream<'a>) as tram =
             _pastEnd.Add(p, f) |> ignore
         else
             let tuple = (p, s)
-            match backlinks.TryGetValue(s) with
-            | true, parsers-> 
+
+            while backlinks.Count <= s do backlinks.Add(null)
+            if backlinks.[s] <> null then
+                let parsers = backlinks.[s]
                 if not <| parsers.ContainsKey(p) then 
                     parsers.Add(p, new FSet<'a>() )
-            | _, _ ->
+            else
                 let nmap = new HOMap<GParser<'a>, FSet<'a> >() in nmap.Add(p, new FSet<'a>())
-                backlinks.Add(s, nmap)
+                backlinks.[s] <- nmap
 
             backlinks.[s].[p].Add(f) |> ignore
 
-            match popped.TryGetValue(s) with
-            | true, parsers when parsers.ContainsKey p ->
+            if s < popped.Count && popped.[s] <> null && popped.[s].ContainsKey p then
+                let parsers = popped.[s]
                 //foundInPopped <- foundInPopped + 1
                 parsers.[p] |> Seq.toArray |> Seq.iter(fun res ->            // if we've already done that, use the result
                     trace(lazy(sprintf "Revisited: %A *=> %A\n" tuple res))
                     f res )
             
-            | _ ->
+            else
     //            if not (_done.ContainsKey s) then _done.Add(s, new HashSet<GParser<'a> >())
     //            if not (_done.[s].Contains p) then 
     //                _queue.Add(tuple)
     //                _done.[s].Add(p) |> ignore
 
-                //notFoundInPopped <- notFoundInPopped + 1
                 let addTuple(parsers: HashSet<GParser<'a> >) = 
-                    //notFoundInDone <- notFoundInDone + 1
                     _queue.Add(tuple)
                     parsers.Add(p) |> ignore
                     trace(lazy(sprintf "Added: %A\n" tuple))
-                    //queuePushed <- queuePushed + 1
 
-                match _done.TryGetValue(s) with
-                | true, parsers ->
+                while _done.Count <= s do _done.Add(null)
+                if _done.[s] <> null then
+                    let parsers = _done.[s]
                     if not <| parsers.Contains (p) then 
                         addTuple(parsers) 
-                | _, _ ->
+                else
                     let parsers = new HashSet<GParser<'a> >()
-                    _done.Add(s, parsers)
-                    //savedToDone <- savedToDone + 1
+                    _done.[s] <- parsers
                     addTuple(parsers)
 
 #nowarn "1189"
