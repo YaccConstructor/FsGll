@@ -55,8 +55,13 @@
   <Import Project="$(FSharpTargetsPath)" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <ItemGroup>
-    <Compile Include="Tests.fs" />
     <None Include="paket.references" />
+    <Compile Include="ExtCalcLexer.fs" />
+    <Compile Include="TestingCommon.fs" />
+    <Compile Include="Tests.Incremental.fs" />
+    <Compile Include="TestsPure.fs" />
+    <Compile Include="TestsNonPure.fs" />
+    <Compile Include="Tests.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -548,4 +553,7 @@
     </Reference>
   </ItemGroup>
   <Import Project="..\..\packages\FsLexYacc\build\FsLexYacc.targets" Condition="Exists('..\..\packages\FsLexYacc\build\FsLexYacc.targets')" Label="Paket" />
+  <PropertyGroup>
+    <PreBuildEvent>$(SolutionDir)packages\FsLexYacc\build\fslex --unicode $(ProjectDir)ExtCalcLexer.fsl</PreBuildEvent>
+  </PropertyGroup>
 </Project>

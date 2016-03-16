@@ -1,4 +1,4 @@
-module FsGll.Tests
+module FsGll.Tests.Unit
 
 open NUnit.Framework
 open FsGll
