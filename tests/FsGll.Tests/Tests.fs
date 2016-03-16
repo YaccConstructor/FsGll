@@ -44,3 +44,20 @@ let private nnnTest fn n =
 
 [<Test>] let ``grammar ExtCalc, pure, case 1`` () = ExtCalcCases.case1 TestsPure.runExtCalc |> Assert.IsTrue
 [<Test>] let ``grammar ExtCalc, pure (fslex), case 1`` () = ExtCalcCases.case1 TestsPure.runExtCalcFslex |> Assert.IsTrue
+
+open FsGll.Mutable.PriorityQueue
+[<Test>] 
+let ``priority queue test 1`` () = 
+    let q = new PriorityQueue<int>((-))
+    let initial = [1; 3; 5; 1; 10; 2; 13; 1; 1; 23; 9; 8; 7; 43] 
+    List.iter q.Add initial
+    let items = [0 .. initial.Length - 1] |> List.map (fun _ -> q.Pop ())
+    let ck1 = (items = List.sort initial) 
+    let ck2 = q.Count = 0
+    let additional1 = [5; 3; 8; 1; 3]
+    List.iter q.Add additional1
+    let ck3 = q.Pop() = 1
+    q.Add(-1)
+    let ck4 = q.Pop() = -1
+    let ck5 = q.Pop() = 3
+    ([ck1;ck2;ck3;ck4;ck5] |> List.forall ((=)true)) |> Assert.IsTrue
