@@ -6,7 +6,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>8382f961-d28c-49b5-b1a9-cf026bbcea94</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <RootNamespace>FsGll</RootNamespace>
     <AssemblyName>FsGll</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
@@ -62,6 +62,7 @@
     <None Include="paket.references" />
     <None Include="paket.template" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="FsGll.Mutable.PriorityQueue.fs" />
     <Compile Include="InputStream.fs" />
     <Compile Include="ExtCalcLexer.fs" />
     <Compile Include="AbstractParsers.fs" />
@@ -73,7 +74,6 @@
     <Compile Include="TestsNonPure.fs" />
     <Compile Include="TestsPure.fs" />
     <Compile Include="Tests3.fs" />
-    <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

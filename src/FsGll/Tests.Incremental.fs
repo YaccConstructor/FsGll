@@ -51,13 +51,13 @@ let getIncremental<'a, 'b when 'b: equality> (lst: GParserResult<'a> list) =
     part.Parser
 
 let incrementalTest () = 
-    let res = runExtCalc("1+2*")
+    let res = runExtCalc("1+2*4")
     printfn "%A" res
     let f = getIncremental<_, E> res
     let g = runParser f "(3"
     let g' = getIncremental<_, E> g
-    let h1 = runParser f "3+4"
+    //let h1 = runParser f "3+4"
     let h2 = runParser g' "+4)"
-    printfn "%A" h1
+    //printfn "%A" h1
     printfn "%A" h2
     

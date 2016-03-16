@@ -25,10 +25,13 @@ type Lexem =
                           | MULT ->   (match l with MULT -> true | _ -> false)
                           | DIV ->    (match l with DIV -> true | _ -> false)
                           | EQ ->     (match l with EQ -> true | _ -> false)
+                          | LT ->     (match l with LT -> true | _ -> false)
+                          | LE ->     (match l with LE -> true | _ -> false)
+                          | GT ->     (match l with GT -> true | _ -> false)
+                          | GE ->     (match l with GE -> true | _ -> false)
                           | LPAREN -> (match l with LPAREN -> true | _ -> false)
                           | RPAREN -> (match l with RPAREN -> true | _ -> false)
                           | SEMICOLON -> (match l with SEMICOLON -> true | _ -> false)
-                          | LT ->     (match l with LT -> true | _ -> false)
                           | _ -> false
         | _ -> failwith "Lexem expected"
 

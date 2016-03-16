@@ -3,6 +3,8 @@
 open System
 open System.Collections.Generic
 
+open FsGll.Mutable.PriorityQueue
+
 type StreamIndex = int
 
 [<AbstractClass>]
@@ -105,16 +107,19 @@ and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () =
         )
         t.Run()
         if t.PastEnd.Count > 0 then 
-            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t, successes, failures)) :> GParserResult<'a>
+            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t)) :> GParserResult<'a>
             part :: (successes |> Seq.toList)
         else (if successes.Count = 0 then failures else successes) |> Seq.toList
+
 // Implemented with shallow copying trampoline
-and PartialParser<'a, 'r when 'r : equality> (oldT: Trampoline<'a>, successes: HashSet<GParserResult<'a> >, failures: HashSet<GParserResult<'a> >) = 
+and PartialParser<'a, 'r when 'r : equality> (oldT: Trampoline<'a>) = 
     inherit Parser<'a, 'r> ()
     let stream: InputStream<'a> = oldT.Stream
     let _pastEnd = new HashSet<_>(oldT.PastEnd |> Seq.map id)
     override this.Apply(inp: InputStream<'a>) = 
         let ind = stream.End
+        
+        let (successes, failures) = new RSet<'a>(), new RSet<'a>()
 
         let t = oldT.ContinuedAt(inp)
 
@@ -124,7 +129,7 @@ and PartialParser<'a, 'r when 'r : equality> (oldT: Trampoline<'a>, successes: H
             t.Add (p, ind) f
         t.Run()
         if t.PastEnd.Count > 0 then 
-            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t, successes, failures)) :> GParserResult<'a>
+            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t)) :> GParserResult<'a>
             part :: (successes |> Seq.toList)
         else (if successes.Count = 0 then failures else successes) |> Seq.toList
     override this.Chain(_, _) _ = failwith "Not implemented for PartialParser"
@@ -156,6 +161,7 @@ and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Pa
         )
     //interface IComparable with
         //member x.CompareTo y = compare (x.GetHashCode()) (y.GetHashCode())
+
 and Trampoline<'a>(initStream: InputStream<'a>, 
                    _done: ResizeArray<HashSet<GParser<'a> > >,
                    popped: ResizeArray<HOMap<GParser<'a>, SSet<'a> > >,
@@ -163,19 +169,22 @@ and Trampoline<'a>(initStream: InputStream<'a>,
                    saved: HOMap<GParserResult<'a>, FSet<'a> >) as tram =
     let mutable stream = initStream
     // R
-    let _queue = new ResizeArray<GParser<'a> * StreamIndex>() 
+    let _queue = new PriorityQueue<GParser<'a> * StreamIndex >(fun (_, i1) (_, i2) -> i1 - i2) 
     let _pastEnd = new HashSet<GParser<'a> * Continuation<'a> >()
 
+    let posTrace = new ResizeArray<string>()
+
     let remove() = 
-        let ind = _queue.Count - 1
-        let tup = _queue.[ind]
-        _queue.RemoveAt ind |> ignore
+        //let ind = _queue.Count - 1
+        //let tup = _queue.[ind]
+        let tup = _queue.Pop()
+        //_queue.RemoveAt ind |> ignore
         trace <| lazy (sprintf "Removed: %A" tup)
         tup
 
     let step() =
         let p, s = remove()
-        //postrace.Add(sprintf "%d %A" s.Ind p)
+        //posTrace.Add(sprintf "%d %A" s p)
         let cont = fun (res: GParserResult<'a>) ->
             while popped.Count <= s do popped.Add(null)
             if popped.[s] <> null then
@@ -196,17 +205,13 @@ and Trampoline<'a>(initStream: InputStream<'a>,
                 backlinks.[s].[p] |> Seq.toArray |> Array.iter (fun f ->
                     if not (set.Contains(f)) then
                         set.Add f |> ignore
-                        //savedToSaved <- savedToSaved + 1
                         f res
-                    //else 
-                        //foundInSaved <- foundInSaved + 1
                 )
             | _, _ -> 
                 let set = new HashSet<GParserResult<'a> -> unit>()
                 saved.Add (res, set)
                 backlinks.[s].[p] |> Seq.toArray |> Array.iter (fun f ->
                     set.Add f |> ignore
-                    //savedToSaved <- savedToSaved + 1
                     f res 
                 )
 //        if not (stream.Inside(s)) && p.Consuming then 
@@ -229,10 +234,10 @@ and Trampoline<'a>(initStream: InputStream<'a>,
     member this.Done   = _done
     member this.Backlinks = backlinks
     member this.Queue = _queue
+    member this.PosTrace = posTrace
     member this.PastEnd : HashSet<GParser<'a> * Continuation<'a> > = _pastEnd
-
+    
     member this.ContinuedAt (newTail: InputStream<'a>) : Trampoline<'a> = 
-        let ind = stream.End
         new Trampoline<'a>(stream.Extend(newTail), 
                            new ResizeArray<_>(_done), 
                            new ResizeArray<_>(popped), 
