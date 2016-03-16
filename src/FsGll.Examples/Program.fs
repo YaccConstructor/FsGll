@@ -7,7 +7,7 @@ open System.Collections.Generic
 //open Parsersok
 open FSharpx.Prelude
 open System.Diagnostics
-open Tests3
+open FsGll.Tests3
            
 //type MyData<'a> = 
 //    | Constr of 'a
@@ -25,7 +25,7 @@ open FsGll.Mutable.PriorityQueue
 [<EntryPoint>]
 let main argv =
 
-    Tests.Incremental.incrementalTest()
+    //Tests.Incremental.incrementalTest()
 //    let res = TestsPure.runExtCalc("a = 0; var = a + 1111.2       ;  a - var * 2 + 837 / (x-3)   ")
 //    printfn "%A" res
     failwith "here"

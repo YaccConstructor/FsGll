@@ -1,7 +1,7 @@
 module FsGll.Tests
 
-open FsGll
 open NUnit.Framework
+open FsGll
 open FsGll.PureParsers
 open FsGll.InputStream
 open FsGll.TestingCommon
