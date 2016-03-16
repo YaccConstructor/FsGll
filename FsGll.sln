@@ -1,6 +1,7 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{63297B98-5CED-492C-A5B7-A5B4F73CF142}"
 	ProjectSection(SolutionItems) = preProject
 		paket.dependencies = paket.dependencies
@@ -34,6 +35,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{ED8079DD
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsGll.Tests", "tests\FsGll.Tests\FsGll.Tests.fsproj", "{44C5E689-077E-44CF-9BA3-A375B007962E}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FsGll.Examples", "src\FsGll.Examples\FsGll.Examples.fsproj", "{929109F9-087E-4D7C-B416-A25A962CF73C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,6 +51,10 @@ Global
 		{44C5E689-077E-44CF-9BA3-A375B007962E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{44C5E689-077E-44CF-9BA3-A375B007962E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{44C5E689-077E-44CF-9BA3-A375B007962E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{929109F9-087E-4D7C-B416-A25A962CF73C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{929109F9-087E-4D7C-B416-A25A962CF73C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{929109F9-087E-4D7C-B416-A25A962CF73C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{929109F9-087E-4D7C-B416-A25A962CF73C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
