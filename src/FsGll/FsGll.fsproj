@@ -67,6 +67,7 @@
     <Compile Include="AbstractParsers.fs" />
     <Compile Include="PureParsers.fs" />
     <Compile Include="Parsers.Incremental.fs" />
+    <Compile Include="Parsers.Pure.Incremental.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

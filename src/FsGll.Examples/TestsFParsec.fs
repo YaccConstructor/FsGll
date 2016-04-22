@@ -19,6 +19,8 @@ let (<!>) (p: Parser<_,_>) label : Parser<_,_> = p
 //        printfn "%A: Leaving %s (%A)" stream.Position label reply.Status
 //        reply
 
+let opp = new OperatorPrecedenceParser<E, string, unit>()
+
 let extCalcLexerAndParser () =
     let factor, factorRef = createParserForwardedToRef()
     let term, termRef     = createParserForwardedToRef()

@@ -22,13 +22,16 @@ open FsGll.Tests3
 //hand a1
                  
 open FsGll.Mutable.PriorityQueue    
+
+let printUsage() = 
+    printfn "Usage: <pgm> (-run=<Run> | -test=<Test> [-n=<N>] [-log=<Log>] [-ecpath=<ExtCalc tests dir path>])"
+    printfn "       Test: (nnn|nnn-pure|extc|extc-pure|extc-fparsec|extc-fslex)"
+    printfn "       Run: (incr|cool-incr)"
+
 [<EntryPoint>]
 let main argv =
-
-    FsGll.Tests.Incremental.incrementalTest()
-//    let res = TestsPure.runExtCalc("a = 0; var = a + 1111.2       ;  a - var * 2 + 837 / (x-3)   ")
-//    printfn "%A" res
-    failwith "here"
+    //let res = TestsPure.runExtCalc("a = 0; var = a + 1111.2       ;  a - var * 2 + 837 / (x-3)   ")
+    //printfn "%A" res
     //printfn "%s" (genExtCalc 50 10)
     //runExample()
     let getArg arg = 
@@ -37,14 +40,21 @@ let main argv =
             then s.Substring(arg.Length + 2).Trim().Trim([| '"' |]).Trim() |> Some 
             else None)
         if ar.Length = 1 then Some <| ar.[0] else None
-
+    
+    let run = getArg "run"
     let log = getArg "log"
     let test = getArg "test"
     let n = getArg "n"
     let ecpath = getArg "ecpath"
-    if test.IsSome then 
+
+    let run = Some("cool-incr")in let test = None
+
+    if run.IsSome && test.IsNone then 
+        match run.Value with 
+        | "incr" -> FsGll.Tests.Pure.Incremental.incrementalTest()
+        | "cool-incr" -> FsGll.Tests.Pure.Incremental.coolIncrementalTest() 
+        | _ -> printUsage()
+    elif test.IsSome && run.IsNone then 
         measurePerformance test.Value n log ecpath 
-    else 
-        //runExample ()
-        printfn "Usage: <pgm> -test=<Test> [-n=<N>] [-log=<Log>] [-ecpath=<ExtCalc tests dir path>]"
+    else printUsage()
     0

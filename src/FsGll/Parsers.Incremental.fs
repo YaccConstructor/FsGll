@@ -39,6 +39,7 @@ type GParserResult<'a> (tail: StreamIndex) =
         
 type GSuccess<'a, 'r when 'r: equality> (value: 'r, tail: StreamIndex) = 
     inherit GParserResult<'a>(tail)
+    let myhash = lazy (hash value + hash tail)
     override this.Succeeded = true
     member this.Data = (value, tail)
     member this.Value = value
@@ -47,7 +48,7 @@ type GSuccess<'a, 'r when 'r: equality> (value: 'r, tail: StreamIndex) =
         match that with 
         | :? GSuccess<'a, 'r> as that -> value = that.Value && tail = that.Tail
         | _ -> false
-    override this.GetHashCode() = hash value + hash tail
+    override this.GetHashCode() = myhash.Value
 
 type GFailure<'a> (msg: string, tail: StreamIndex) = 
     inherit GParserResult<'a> (tail)

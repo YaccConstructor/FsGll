@@ -1,14 +1,14 @@
-﻿module FsGll.Tests.Incremental
+﻿module FsGll.Tests.Pure.Incremental
 
 open System
 open System.Text.RegularExpressions
 open FSharpx.Prelude
 open FsGll.TestingCommon
-open FsGll.Parsers.Incremental
+open FsGll.Parsers.Pure.Incremental
 open FsGll.ExtCalcLexer
 
 
-let private chr c = satisfy ((=)c)
+let private chr c = satisfy (fun ch -> ch = c)
 let private tok t = satisfy ((=)t)
 let private whitespace = satisfy <| fun c -> c = ' ' || c = '\n' || c = '\r' || c = '\t'
 let private bws p = many whitespace >>. p .>> many whitespace
@@ -43,6 +43,7 @@ let runExtCalc (inp) =
     inp |> runParser ecp
 
 let getIncremental<'a, 'b when 'b: equality> (lst: GParserResult<'a> list) = 
+    
     let partials = 
         lst 
         |> List.filter (function :? GPartial<'a, 'b> -> true | _ -> false) 
@@ -52,14 +53,18 @@ let getIncremental<'a, 'b when 'b: equality> (lst: GParserResult<'a> list) =
 
 let coolIncrementalTest () = 
     let res = runExtCalc("1+2*4")
-    printfn "%A" res
+
+    printfn "res:\n %A\n" res
     let f = getIncremental<_, E> res
-    let g = runParser f "(3"
+    let g = runParser f "+(3"
+    
     let g' = getIncremental<_, E> g
-    //let h1 = runParser f "3+4"
+    let h1 = runParser f "3+4"
+    
     let h2 = runParser g' "+4)"
-    //printfn "%A" h1
-    printfn "%A" h2
+    printfn "h1:\n%A\n" h1
+    printfn "h2:\n%A\n" h2
+    5 |> ignore
 
 let incrementalTest () = 
     let res = runExtCalc("1+2*")

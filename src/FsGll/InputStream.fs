@@ -3,7 +3,11 @@
 open System
 open System.Text.RegularExpressions
 
+[<Interface>]
+type ISwitchable = interface end
+
 [<AbstractClass>]
+[<AllowNullLiteral>]
 type InputStream<'a> (ind: int) = 
     abstract member Head : 'a
     abstract member IsEmpty: bool
@@ -17,7 +21,35 @@ type InputStream<'a> (ind: int) =
     override this.GetHashCode() = ind.GetHashCode()
     interface IComparable with
         override this.CompareTo that = this.Ind - (that :?> InputStream<'a>).Ind
-            
+
+type SwitchableInputStream<'a>(s: InputStream<'a> ref, ind: int) = 
+    inherit InputStream<'a>(0)
+    member x.SwitchTo(newS) = s := newS
+    override this.Head = (!s).Head
+    override this.IsEmpty = (!s).IsEmpty
+    override this.Drop = (!s).Drop
+    override this.ToString() = (!s).ToString()
+
+[<AllowNullLiteral>]
+type SwitchableArrayInputStream<'a>(arr: 'a [] ref, ind: int, _base: int ref) = 
+    inherit InputStream<'a>(ind)
+    member this.SwitchTo(x) = arr := x
+    member this.Array = (!arr)
+    member this.Base = (!_base)
+    member this.InternalInd = ind - !_base
+    member this.Extend(narr: 'a []) = 
+        _base := (!_base) + (!arr).Length
+        arr := narr
+        new SwitchableArrayInputStream<'a>(arr, !_base, _base)  
+
+    override this.Head = 
+        if this.IsEmpty then
+            printfn "fuck"
+        (!arr).[this.InternalInd]
+    override this.IsEmpty = this.InternalInd >= (!arr).Length
+    override this.Drop = new SwitchableArrayInputStream<'a>(arr, ind + 1, _base) :> InputStream<'a>
+    override this.ToString() = sprintf "%A" <| Array.sub (!arr) (this.InternalInd) (Array.length (!arr) - (this.InternalInd))
+
 type ArrayInputStream<'a> (arr: 'a [], ind: int) = 
     inherit InputStream<'a>(ind)
     override this.Head = arr.[ind]

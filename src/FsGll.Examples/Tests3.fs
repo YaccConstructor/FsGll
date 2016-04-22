@@ -141,10 +141,12 @@ let doDebug () =
     Console.ReadLine () |> ignore
 
 let measurePerformance test (n: string option) (log: string option) (ecpath: string option) =
-    let withECPath f = match ecpath with 
+    let withECPath f = 
+        match ecpath with 
         | Some(ecpath) -> f ecpath
         | None -> printfn "ecpath parameter required"
-    let withN f = match n with
+    let withN f = 
+        match n with
         | Some(n) ->
             match Int32.TryParse(n) with
             | true, n -> f n

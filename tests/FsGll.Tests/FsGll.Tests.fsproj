@@ -62,6 +62,7 @@
     <Compile Include="TestsPure.fs" />
     <Compile Include="TestsNonPure.fs" />
     <Compile Include="Tests.fs" />
+    <Compile Include="Tests.Pure.Incremental.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
