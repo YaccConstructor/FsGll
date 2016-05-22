@@ -38,6 +38,15 @@ let extCalcLexerAndParser () =
     let pgm = pipe2 (many stmt) expr (curry EPgm)
     pgm
 
+let nnnParser () =
+    let tok c = satisfy ((=)c)
+    let digit = tok '0' |>> string
+    let expr, exprRef = createParserForwardedToRef<_, string>("expr")
+    exprRef :=  (pipe3 expr expr expr (fun a b c -> a + b + c)) 
+            <|> (pipe2 expr expr (+)) 
+            <|> (digit)
+    expr
+
 let runExtCalc (inp) =
     let ecp = extCalcLexerAndParser ()
     inp |> runParser ecp
@@ -68,3 +77,13 @@ let incrementalTest () =
     let g = getIncremental<_, E> g'
     let h = runParser g "+4)"
     printfn "%A" h
+
+let NNNIncrTest (n) = 
+    let p = ref <| nnnParser ()
+    let res = ref []
+    for i = 1 to n do 
+        res := runParser !p "0"
+        let f = getIncremental<_, _> !res
+        p := f
+    printfn "%A" res
+    

@@ -108,19 +108,20 @@ and [<AbstractClass>] NonTerminalParser<'a, 'r when 'r : equality> () =
         )
         t.Run()
         if t.PastEnd.Count > 0 then 
-            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t)) :> GParserResult<'a>
+            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t, successes, failures)) :> GParserResult<'a>
             part :: (successes |> Seq.toList)
         else (if successes.Count = 0 then failures else successes) |> Seq.toList
 
 // Implemented with shallow copying trampoline
-and PartialParser<'a, 'r when 'r : equality> (oldT: Trampoline<'a>) = 
+and PartialParser<'a, 'r when 'r : equality> (oldT: Trampoline<'a>, successes: RSet<'a>, failures: RSet<'a>) = 
     inherit Parser<'a, 'r> ()
     let stream: InputStream<'a> = oldT.Stream
     let _pastEnd = new HashSet<_>(oldT.PastEnd |> Seq.map id)
     override this.Apply(inp: InputStream<'a>) = 
         let ind = stream.End
         
-        let (successes, failures) = new RSet<'a>(), new RSet<'a>()
+        successes.Clear()
+        failures.Clear()
 
         let t = oldT.ContinuedAt(inp)
 
@@ -130,7 +131,7 @@ and PartialParser<'a, 'r when 'r : equality> (oldT: Trampoline<'a>) =
             t.Add (p, ind) f
         t.Run()
         if t.PastEnd.Count > 0 then 
-            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t)) :> GParserResult<'a>
+            let part = new GPartial<'a, 'r>(new PartialParser<'a, 'r>(t, successes, failures)) :> GParserResult<'a>
             part :: (successes |> Seq.toList)
         else (if successes.Count = 0 then failures else successes) |> Seq.toList
     override this.Chain(_, _) _ = failwith "Not implemented for PartialParser"

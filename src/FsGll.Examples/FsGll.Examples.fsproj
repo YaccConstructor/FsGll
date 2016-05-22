@@ -26,6 +26,8 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>bin\Debug\FsGll.Examples.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
+    <StartArguments>-test=nnn -n=50 -log="perf.log" -ecpath="C:\Users\melenk\Documents\GitHub\FsGll\tests\ECTests"</StartArguments>
+    <StartWorkingDirectory>C:\Users\melenk\Documents\GitHub\FsGll\tests\</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -37,6 +39,8 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>bin\Release\FsGll.Examples.XML</DocumentationFile>
     <Prefer32Bit>true</Prefer32Bit>
+    <StartArguments>-test=nnn -n=50 -log="perf.log" -ecpath="C:\Users\melenk\Documents\GitHub\FsGll\tests\ECTests"</StartArguments>
+    <StartWorkingDirectory>C:\Users\melenk\Documents\GitHub\FsGll\tests\</StartWorkingDirectory>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -555,4 +559,7 @@
     </When>
   </Choose>
   <Import Project="..\..\packages\FsLexYacc\build\FsLexYacc.targets" Condition="Exists('..\..\packages\FsLexYacc\build\FsLexYacc.targets')" Label="Paket" />
+  <PropertyGroup>
+    <PostBuildEvent />
+  </PropertyGroup>
 </Project>

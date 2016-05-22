@@ -27,8 +27,8 @@ let extCalcParser () =
     let additiveOp     = tok PLUS <|> minus
 
     factorRef     := value <|> variable <|> (pipe2 minus factor (curry EUnary)) <|> (lparen >>. expr .>> rparen)
-    termRef       := pipe3 factor multOp term (fun a x b -> match x with MULT -> EM (a, '*', b) | DIV -> EM (a, '/', b) | _ -> failwith "er") <|> factor
-    exprRef       := pipe3 term additiveOp expr (fun a x b -> match x with PLUS -> EP (a, '+', b) | MINUS -> EP (a, '-', b) | _ -> failwith "er") <|> term
+    termRef       := pipe3 term multOp factor (fun a x b -> match x with MULT -> EM (a, '*', b) | DIV -> EM (a, '/', b) | _ -> failwith "er") <|> factor
+    exprRef       := pipe3 expr additiveOp term (fun a x b -> match x with PLUS -> EP (a, '+', b) | MINUS -> EP (a, '-', b) | _ -> failwith "er") <|> term
     let stmt = pipe2 (variable .>> assign) (expr .>> semicolon) (curry EAssign)
     let pgm = pipe2 (many stmt) expr (curry EPgm)
     //pipe3 (value <|> variable) multOp (value <|> variable) (fun a x b -> (a,x,b))

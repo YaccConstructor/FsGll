@@ -39,8 +39,8 @@ let private nnnTest fn n =
 [<Test>] let ``grammar NNN, pure, 10ch`` () = nnnTest TestsNonPure.runNnn 10
 [<Test>] let ``grammar NNN, pure, 30ch`` () = nnnTest TestsNonPure.runNnn 30
 
-[<Test>] let ``grammar ExtCalc, non-pure, case 1`` () = ExtCalcCases.case1 TestsNonPure.runExtCalc |> Assert.IsTrue
-[<Test>] let ``grammar ExtCalc, non-pure (fslex), case 1`` () = ExtCalcCases.case1 TestsNonPure.runExtCalcFslex |> Assert.IsTrue
+//[<Test>] let ``grammar ExtCalc, non-pure, case 1`` () = ExtCalcCases.case1 TestsNonPure.runExtCalc |> Assert.IsTrue
+//[<Test>] let ``grammar ExtCalc, non-pure (fslex), case 1`` () = ExtCalcCases.case1 TestsNonPure.runExtCalcFslex |> Assert.IsTrue
 
 [<Test>] let ``grammar ExtCalc, pure, case 1`` () = ExtCalcCases.case1 TestsPure.runExtCalc |> Assert.IsTrue
 [<Test>] let ``grammar ExtCalc, pure (fslex), case 1`` () = ExtCalcCases.case1 TestsPure.runExtCalcFslex |> Assert.IsTrue

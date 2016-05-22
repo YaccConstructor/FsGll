@@ -171,7 +171,6 @@ and DisjunctiveParser<'a, 'r when 'r : equality>(left: Parser<'a, 'r>, right: Pa
                     f res
                     (res) |> results.Add |> ignore
             )
-            
         )
     //interface IComparable with
         //member x.CompareTo y = compare (x.GetHashCode()) (y.GetHashCode())
@@ -201,7 +200,7 @@ and Trampoline<'a>() as tram =
         let ind = _queue.Count - 1
         let tup = _queue.[ind]
         _queue.RemoveAt ind |> ignore
-        trace <| lazy (sprintf "Removed: %A" tup)
+        //trace <| lazy (sprintf "Removed: %A" tup)
         tup
 
     let step() =
@@ -219,7 +218,7 @@ and Trampoline<'a>() as tram =
             if res.Succeeded then
                 popped.[s].[p].Add(res) |> ignore
                 //savedToPopped <- savedToPopped + 1
-                trace(lazy (sprintf "Saved (to popped): %A *=> %A\n" (p, s) res))
+                //trace(lazy (sprintf "Saved (to popped): %A *=> %A\n" (p, s) res))
 
             match saved.TryGetValue(res) with
             | true, set ->
@@ -269,7 +268,7 @@ and Trampoline<'a>() as tram =
         | true, parsers when parsers.ContainsKey p ->
             //foundInPopped <- foundInPopped + 1
             parsers.[p] |> Seq.toArray |> Seq.iter(fun res ->            // if we've already done that, use the result
-                trace(lazy(sprintf "Revisited: %A *=> %A\n" tuple res))
+                //trace(lazy(sprintf "Revisited: %A *=> %A\n" tuple res))
                 f res )
             
         | _ ->
@@ -283,7 +282,7 @@ and Trampoline<'a>() as tram =
                 //notFoundInDone <- notFoundInDone + 1
                 _queue.Add(tuple)
                 parsers.Add(p) |> ignore
-                trace(lazy(sprintf "Added: %A\n" tuple))
+                //trace(lazy(sprintf "Added: %A\n" tuple))
                 //queuePushed <- queuePushed + 1
 
             match _done.TryGetValue(s) with
