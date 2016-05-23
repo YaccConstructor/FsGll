@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Incremental - FsGll</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content=""/>
+    <meta name="author" content="melentyev"/>
+
+    <script src="https://code.jquery.com/jquery-1.8.0.js"></script>
+    <script src="https://code.jquery.com/ui/1.8.23/jquery-ui.js"></script>
+    <script src="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/js/bootstrap.min.js"></script>
+    <link href="https://netdna.bootstrapcdn.com/twitter-bootstrap/2.2.1/css/bootstrap-combined.min.css" rel="stylesheet"/>
+
+    <link type="text/css" rel="stylesheet" href="/FsGll/content/style.css" />
+    <script type="text/javascript" src="/FsGll/content/tips.js"></script>
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="container">
+      <div class="masthead">
+        <ul class="nav nav-pills pull-right">
+          <li><a href="http://fsharp.org">fsharp.org</a></li>
+          <li><a href="http://github.com/melentyev/FsGll">github page</a></li>
+        </ul>
+        <h3 class="muted"><a href="/FsGll/index.html">FsGll</a></h3>
+      </div>
+      <hr />
+      <div class="row">
+        <div class="span9" id="main">
+          
+
+
+
+<h1>Incremental</h1>
+<p>
+  <span>Namespace: FsGll.Parsers.Pure</span><br />
+</p>
+<div class="xmldoc">
+</div>
+
+<!-- Render nested types and modules, if there are any -->
+  <h2>Nested types and modules</h2>
+  <div>
+      <table class="table table-bordered type-list">
+    <thead>
+      <tr><td>Type</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-cont.html">Cont</a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-continuation-1.html">Continuation<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-disjunctiveparser-2.html">DisjunctiveParser<'a, 'r></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-fset-1.html">FSet<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-gfailure-1.html">GFailure<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-gparser-1.html">GParser<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-gparserresult-1.html">GParserResult<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-gpartial-2.html">GPartial<'a, 'r></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-gsuccess-2.html">GSuccess<'a, 'r></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-homap-2.html">HOMap<'k, 'v></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-nonterminalparser-2.html">NonTerminalParser<'a, 'r></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-pstate-1.html">PState<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-parser-2.html">Parser<'a, 'r></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-partialparser-2.html">PartialParser<'a, 'r></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-rset-1.html">RSet<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-sset-1.html">SSet<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-t.html">T</a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-tuid.html">TUid</a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-trampoline-1.html">Trampoline<'a></a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+        <tr>
+          <td class="type-name">
+            <a href="fsgll-parsers-pure-incremental-unique.html">Unique</a>
+          </td>
+          <td class="xmldoc"></td>
+        </tr>
+    </tbody>
+  </table>
+
+  </div>
+
+  <h3>Functions and values</h3>
+  <table class="table table-bordered member-list">
+    <thead>
+      <tr><td>Function or value</td><td>Description</td></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '96', 96)" onmouseover="showTip(event, '96', 96)">
+            ( .&gt;&gt; ) p q
+          </code>
+          <div class="tip" id="96">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; q:Parser&lt;&#39;a,&#39;r2&gt; -&gt; Parser&lt;&#39;a,&#39;r&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r, 'r2          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L360-360" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_DotGreaterGreater</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '97', 97)" onmouseover="showTip(event, '97', 97)">
+            ( .&gt;&gt;. ) p1 p2
+          </code>
+          <div class="tip" id="97">
+            <strong>Signature:</strong> p1:Parser&lt;&#39;?7729,&#39;?7730&gt; -&gt; p2:Parser&lt;&#39;?7729,&#39;?7731&gt; -&gt; Parser&lt;&#39;?7729,(&#39;?7730 * &#39;?7731)&gt;<br />
+                          <strong>Type parameters:</strong> '?7729, '?7730, '?7731          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L382-382" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_DotGreaterGreaterDot</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '98', 98)" onmouseover="showTip(event, '98', 98)">
+            ( |&gt;&gt; ) p fn
+          </code>
+          <div class="tip" id="98">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; fn:(&#39;r -&gt; &#39;r2) -&gt; Parser&lt;&#39;a,&#39;r2&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r, 'r2          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L390-390" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_BarGreaterGreater</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '99', 99)" onmouseover="showTip(event, '99', 99)">
+            ( &lt;?&gt; ) p msg
+          </code>
+          <div class="tip" id="99">
+            <strong>Signature:</strong> p:Parser&lt;&#39;?7714,&#39;?7715&gt; -&gt; msg:string -&gt; Parser&lt;&#39;?7714,&#39;?7715&gt;<br />
+                          <strong>Type parameters:</strong> '?7714, '?7715          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L354-354" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_LessQmarkGreater</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '100', 100)" onmouseover="showTip(event, '100', 100)">
+            ( &lt;|&gt; ) a b
+          </code>
+          <div class="tip" id="100">
+            <strong>Signature:</strong> a:Parser&lt;&#39;a,&#39;r&gt; -&gt; b:Parser&lt;&#39;a,&#39;r&gt; -&gt; Parser&lt;&#39;a,&#39;r&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L349-349" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_LessBarGreater</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '101', 101)" onmouseover="showTip(event, '101', 101)">
+            ( &lt;|&gt;% ) p x
+          </code>
+          <div class="tip" id="101">
+            <strong>Signature:</strong> p:Parser&lt;&#39;?7711,&#39;?7712&gt; -&gt; x:&#39;?7712 -&gt; Parser&lt;&#39;?7711,&#39;?7712&gt;<br />
+                          <strong>Type parameters:</strong> '?7711, '?7712          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L352-352" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_LessBarGreaterPercent</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '102', 102)" onmouseover="showTip(event, '102', 102)">
+            ( &gt;&gt;% ) this x
+          </code>
+          <div class="tip" id="102">
+            <strong>Signature:</strong> this:Parser&lt;&#39;?7717,&#39;?7718&gt; -&gt; x:&#39;?7719 -&gt; Parser&lt;&#39;?7717,&#39;?7719&gt;<br />
+                          <strong>Type parameters:</strong> '?7717, '?7718, '?7719          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L356-356" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_GreaterGreaterPercent</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '103', 103)" onmouseover="showTip(event, '103', 103)">
+            ( &gt;&gt;. ) p1 p2
+          </code>
+          <div class="tip" id="103">
+            <strong>Signature:</strong> p1:Parser&lt;&#39;?7725,&#39;?7726&gt; -&gt; p2:Parser&lt;&#39;?7725,&#39;?7727&gt; -&gt; Parser&lt;&#39;?7725,&#39;?7727&gt;<br />
+                          <strong>Type parameters:</strong> '?7725, '?7726, '?7727          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L373-373" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_GreaterGreaterDot</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '104', 104)" onmouseover="showTip(event, '104', 104)">
+            ( &gt;&gt;= ) p fn
+          </code>
+          <div class="tip" id="104">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; fn:(&#39;r -&gt; Parser&lt;&#39;a,&#39;r2&gt;) -&gt; Parser&lt;&#39;a,&#39;r2&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r, 'r2          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L311-311" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_GreaterGreaterEquals</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '105', 105)" onmouseover="showTip(event, '105', 105)">
+            ( &gt;&gt;== ) p fn
+          </code>
+          <div class="tip" id="105">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; fn:(&#39;r -&gt; Parser&lt;&#39;a,&#39;r2&gt;) -&gt; Parser&lt;&#39;a,&#39;r2&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r, 'r2          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L306-306" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+              <p>CompiledName: <code>op_GreaterGreaterEqualsEquals</code></p>
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '106', 106)" onmouseover="showTip(event, '106', 106)">
+            between popen pclose p
+          </code>
+          <div class="tip" id="106">
+            <strong>Signature:</strong> popen:Parser&lt;&#39;a,&#39;?7734&gt; -&gt; pclose:Parser&lt;&#39;a,&#39;?7735&gt; -&gt; p:Parser&lt;&#39;a,&#39;r&gt; -&gt; Parser&lt;&#39;a,&#39;r&gt;<br />
+                          <strong>Type parameters:</strong> 'a, '?7734, '?7735, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L386-386" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '107', 107)" onmouseover="showTip(event, '107', 107)">
+            createParserForwardedToRef name
+          </code>
+          <div class="tip" id="107">
+            <strong>Signature:</strong> name:string -&gt; Parser&lt;&#39;a,&#39;r&gt; * Parser&lt;&#39;a,&#39;r&gt; ref<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L425-425" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '108', 108)" onmouseover="showTip(event, '108', 108)">
+            epsilon 
+          </code>
+          <div class="tip" id="108">
+            <strong>Signature:</strong> Parser&lt;obj,unit&gt;<br />
+                          <strong>Type parameters:</strong> 'a          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L347-347" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '109', 109)" onmouseover="showTip(event, '109', 109)">
+            failure msg tail
+          </code>
+          <div class="tip" id="109">
+            <strong>Signature:</strong> msg:string -&gt; tail:SwitchableArrayInputStream&lt;&#39;a&gt; -&gt; GParserResult&lt;&#39;a&gt;<br />
+                          <strong>Type parameters:</strong> 'a          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L68-68" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '110', 110)" onmouseover="showTip(event, '110', 110)">
+            many p
+          </code>
+          <div class="tip" id="110">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; Parser&lt;&#39;a,&#39;r list&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L333-333" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '111', 111)" onmouseover="showTip(event, '111', 111)">
+            many1 p
+          </code>
+          <div class="tip" id="111">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; Parser&lt;&#39;a,&#39;r list&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L321-321" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '112', 112)" onmouseover="showTip(event, '112', 112)">
+            modify f
+          </code>
+          <div class="tip" id="112">
+            <strong>Signature:</strong> f:(&#39;s -&gt; &#39;s) -&gt; State&lt;unit,&#39;s&gt;<br />
+                          <strong>Type parameters:</strong> 's          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L78-78" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '113', 113)" onmouseover="showTip(event, '113', 113)">
+            opt p
+          </code>
+          <div class="tip" id="113">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; Parser&lt;&#39;a,&#39;r option&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L340-340" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '114', 114)" onmouseover="showTip(event, '114', 114)">
+            parserResult r
+          </code>
+          <div class="tip" id="114">
+            <strong>Signature:</strong> r:GParserResult&lt;&#39;a&gt; -&gt; ParserResult&lt;&#39;a,&#39;r&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L70-70" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '115', 115)" onmouseover="showTip(event, '115', 115)">
+            perror msg
+          </code>
+          <div class="tip" id="115">
+            <strong>Signature:</strong> msg:string -&gt; Parser&lt;&#39;a,&#39;r&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L292-292" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '116', 116)" onmouseover="showTip(event, '116', 116)">
+            pipe2 p1 p2 fn
+          </code>
+          <div class="tip" id="116">
+            <strong>Signature:</strong> p1:Parser&lt;&#39;?7742,&#39;?7743&gt; -&gt; p2:Parser&lt;&#39;?7742,&#39;?7744&gt; -&gt; fn:(&#39;?7743 -&gt; &#39;?7744 -&gt; &#39;?7745) -&gt; Parser&lt;&#39;?7742,&#39;?7745&gt;<br />
+                          <strong>Type parameters:</strong> '?7742, '?7743, '?7744, '?7745          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L395-395" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '117', 117)" onmouseover="showTip(event, '117', 117)">
+            pipe3 p1 p2 p3 fn
+          </code>
+          <div class="tip" id="117">
+            <strong>Signature:</strong> p1:Parser&lt;&#39;?7747,&#39;?7748&gt; -&gt; p2:Parser&lt;&#39;?7747,&#39;?7749&gt; -&gt; p3:Parser&lt;&#39;?7747,&#39;?7750&gt; -&gt; fn:(&#39;?7748 -&gt; &#39;?7749 -&gt; &#39;?7750 -&gt; &#39;?7751) -&gt; Parser&lt;&#39;?7747,&#39;?7751&gt;<br />
+                          <strong>Type parameters:</strong> '?7747, '?7748, '?7749, '?7750, '?7751          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L399-399" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '118', 118)" onmouseover="showTip(event, '118', 118)">
+            pipe4 p1 p2 p3 p4 fn
+          </code>
+          <div class="tip" id="118">
+            <strong>Signature:</strong> p1:Parser&lt;&#39;?7753,&#39;?7754&gt; -&gt; p2:Parser&lt;&#39;?7753,&#39;?7755&gt; -&gt; p3:Parser&lt;&#39;?7753,&#39;?7756&gt; -&gt; p4:Parser&lt;&#39;?7753,&#39;?7757&gt; -&gt; fn:(&#39;?7754 -&gt; &#39;?7755 -&gt; &#39;?7756 -&gt; &#39;?7757 -&gt; &#39;?7758) -&gt; Parser&lt;&#39;?7753,&#39;?7758&gt;<br />
+                          <strong>Type parameters:</strong> '?7753, '?7754, '?7755, '?7756, '?7757, '?7758          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L404-404" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '119', 119)" onmouseover="showTip(event, '119', 119)">
+            preturn a
+          </code>
+          <div class="tip" id="119">
+            <strong>Signature:</strong> a:&#39;r -&gt; Parser&lt;&#39;a,&#39;r&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L288-288" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '120', 120)" onmouseover="showTip(event, '120', 120)">
+            runParser p s
+          </code>
+          <div class="tip" id="120">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; s:seq&lt;&#39;a&gt; -&gt; GParserResult&lt;&#39;a&gt; list<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L430-430" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '121', 121)" onmouseover="showTip(event, '121', 121)">
+            satisfy pred
+          </code>
+          <div class="tip" id="121">
+            <strong>Signature:</strong> pred:(&#39;a -&gt; bool) -&gt; Parser&lt;&#39;a,&#39;a&gt;<br />
+                          <strong>Type parameters:</strong> 'a          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L296-296" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '122', 122)" onmouseover="showTip(event, '122', 122)">
+            sepBy p sep
+          </code>
+          <div class="tip" id="122">
+            <strong>Signature:</strong> p:Parser&lt;&#39;a,&#39;r&gt; -&gt; sep:Parser&lt;&#39;a,&#39;?7762&gt; -&gt; Parser&lt;&#39;a,&#39;r list&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r, '?7762          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L410-410" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '123', 123)" onmouseover="showTip(event, '123', 123)">
+            success value tail
+          </code>
+          <div class="tip" id="123">
+            <strong>Signature:</strong> value:&#39;r -&gt; tail:SwitchableArrayInputStream&lt;&#39;a&gt; -&gt; GParserResult&lt;&#39;a&gt;<br />
+                          <strong>Type parameters:</strong> 'a, 'r          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L67-67" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '124', 124)" onmouseover="showTip(event, '124', 124)">
+            trace arg1
+          </code>
+          <div class="tip" id="124">
+            <strong>Signature:</strong> &#39;?7522 -&gt; unit<br />
+                          <strong>Type parameters:</strong> '?7522          </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/melentyev/FsGll/tree/master/src/FsGll/Parsers.Pure.Incremental.fs#L12-12" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+        </div>
+        <div class="span3">
+          <img src="/FsGll/img/logo.png" alt="F# Project" style="width:150px;margin:10px" />  
+          <ul class="nav nav-list" id="menu" style="margin-top: 20px;">
+            <li class="nav-header">FsGll</li>
+            <li><a href="/FsGll/index.html">Home page</a></li>
+            <li class="divider"></li>
+            <li><a href="http://nuget.org/packages/FsGll">Get Library via NuGet</a></li>
+            <li><a href="http://github.com/melentyev/FsGll">Source Code on GitHub</a></li>
+            <li><a href="/FsGll/license.html">License</a></li>
+            <li><a href="/FsGll/release-notes.html">Release Notes</a></li>
+            
+            <li class="nav-header">Getting started</li>
+            <li><a href="/FsGll/tutorial.html">Sample tutorial</a></li>
+
+            <li class="nav-header">Documentation</li>
+            <li><a href="/FsGll/reference/index.html">API Reference</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <a href="http://github.com/melentyev/FsGll"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"/></a>
+  </body>
+  </html>
