@@ -1,20 +1,20 @@
 type project
 owners
-    melentyev
+    YaccConstructor
 authors 
     melentyev
 projectUrl
-    http://github.com/melentyev/FsGll
+    http://github.com/YaccConstructor/FsGll
 iconUrl
-    https://raw.githubusercontent.com/melentyev/FsGll/master/docs/files/img/logo.png
+    https://raw.githubusercontent.com/YaccConstructor/FsGll/master/docs/files/img/logo.png
 licenseUrl
-    http://github.com/melentyev/FsGll/blob/master/LICENSE.txt
+    http://github.com/YaccConstructor/FsGll/blob/master/LICENSE.txt
 requireLicenseAcceptance
     false
 copyright
     Copyright 2015
 tags
-    
+    gll
 summary
     An parser combinator library based on the GLL algorithm for F#
 description
