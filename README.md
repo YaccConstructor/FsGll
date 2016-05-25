@@ -1,7 +1,8 @@
-# FsGll
+# FsGll [![NuGet Status](http://img.shields.io/nuget/v/FsGll.svg?style=flat)](https://nuget.org/packages/FsGll)
 
 A parser combinator library based on the GLL algorithm for F#.
 
+* See the [home page](http://yaccconstructor.github.io/FsGll/) for details about usage.
 * The code is based on [gll-combinators](https://github.com/djspiewak/gll-combinators) library for Scala.
 * Combinators itself is like [FParsec](http://www.quanttec.com/fparsec/).
 * Article on [GLL parser combinators](http://www.cs.uwm.edu/~dspiewak/papers/generalized-parser-combinators.pdf)

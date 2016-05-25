@@ -13,7 +13,7 @@ let referenceBinaries = []
 // Web site location for the generated documentation
 let website = "/FsGll"
 
-let githubLink = "http://github.com/melentyev/FsGll"
+let githubLink = "http://github.com/YaccConstructor/FsGll"
 
 // Specify more information about your project
 let info =

@@ -7,7 +7,7 @@
 FsGll
 ======================
 
-Documentation
+A parser combinator library based on the GLL algorithm for F#.
 
 <div class="row">
   <div class="span1"></div>
@@ -23,13 +23,42 @@ Documentation
 Example
 -------
 
-This example demonstrates using a function defined in this sample library.
+This example demonstrates using this library to construct incremental parser for arithmetical expressions.
 
 *)
 #r "FsGll.dll"
-open FsGll
+open FsGll.Parsers.Incremental.Pure
 
-printfn "hello = %i" <| Library.hello 0
+// utilities
+let isPartial = function Partial(_) -> true 
+                       | _          -> false
+let getPartial = List.tryFind isPartial
+let parse p s = runParser<_,_> p (stringStream s)
+
+// construct parser
+let e, er = createParserForwardedToRef<_>()
+let t, tr = createParserForwardedToRef<_>()
+let chr c = satisfy ((=)c) 
+let op = chr '+' <|> chr '-' 
+     <|> chr '*' <|> chr '/'
+let num = satisfy (Char.IsDigit) |>> Int32.Parse
+let f = num <|> (chr '(' >>. e .>> chr')')
+
+let sem l x r = 
+    match x with 
+    | '+' -> l + r 
+    | '-' -> l - r
+    | '*' -> l + r 
+    | '/' -> l - r
+    
+er := pipe3 e op t sem <|> t
+tr := pipe3 t op f sem <|> f
+
+// run
+let f = parse e "1+2*" |> getPartial 
+let g = parse f "(3" |> getPartial
+let h1 = parse f "3+4"
+let h2 = parse g "+4)"
 
 (**
 Some more info
@@ -59,9 +88,9 @@ The library is available under Public Domain license, which allows modification 
 redistribution for both commercial and non-commercial purposes. For more information see the 
 [License file][license] in the GitHub repository. 
 
-  [content]: https://github.com/fsprojects/FsGll/tree/master/docs/content
-  [gh]: https://github.com/fsprojects/FsGll
-  [issues]: https://github.com/fsprojects/FsGll/issues
-  [readme]: https://github.com/fsprojects/FsGll/blob/master/README.md
-  [license]: https://github.com/fsprojects/FsGll/blob/master/LICENSE.txt
+  [content]: https://github.com/YaccConstructor/FsGll/tree/master/docs/content
+  [gh]: https://github.com/YaccConstructor/FsGll
+  [issues]: https://github.com/YaccConstructor/FsGll/issues
+  [readme]: https://github.com/YaccConstructor/FsGll/blob/master/README.md
+  [license]: https://github.com/YaccConstructor/FsGll/blob/master/LICENSE.txt
 *)

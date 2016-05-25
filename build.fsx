@@ -42,7 +42,7 @@ let description = "FsGll"
 let authors = [ "melentyev" ]
 
 // Tags for your project (for NuGet package)
-let tags = ""
+let tags = "gll"
 
 // File system information
 let solutionFile  = "FsGll.sln"
@@ -59,7 +59,7 @@ let gitHome = "https://github.com/" + gitOwner
 let gitName = "FsGll"
 
 // The url for the raw files hosted
-let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/melentyev"
+let gitRaw = environVarOrDefault "gitRaw" "https://raw.github.com/YaccConstructor"
 
 // --------------------------------------------------------------------------------------
 // END TODO: The rest of the file includes standard build steps
